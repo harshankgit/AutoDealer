@@ -20,7 +20,7 @@ interface Booking {
     price: number;
     images: string[];
   };
-  roomId: {
+  roomid: {
     id: string;
     name: string;
     location: string;
@@ -181,20 +181,19 @@ export default function UserBookingsPage() {
                     <div className="flex items-center text-gray-600 dark:text-gray-300">
                       <MapPin className="h-4 w-4 mr-2 flex-shrink-0" />
                       <span className="truncate">
-                        {booking.roomId?.name || 'Showroom not specified'}
-                        {booking.roomId?.location && `, ${booking.roomId.location}`}
+                        {booking.roomid ? `${booking.roomid.name} - ${booking.roomid.location}` : 'Location not specified'}
                       </span>
                     </div>
                     
                     <div className="flex items-center text-gray-600 dark:text-gray-300">
                       <Phone className="h-4 w-4 mr-2" />
-                      <span>{booking.bookingDetails.phone}</span>
+                      <span>{booking.bookingDetails?.phone || 'Phone not provided'}</span>
                     </div>
                     
-                    {booking.bookingDetails.notes && (
+                    {booking.bookingDetails?.notes && (
                       <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
                         <p className="text-sm text-gray-600 dark:text-gray-400">
-                          <span className="font-medium">Notes:</span> {booking.bookingDetails.notes}
+                          <span className="font-medium">Notes:</span> {booking.bookingDetails?.notes}
                         </p>
                       </div>
                     )}

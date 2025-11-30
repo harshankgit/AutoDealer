@@ -22,7 +22,7 @@ interface Booking {
     price: number;
     images: string[];
   } | string; // Could be string if not populated
-  roomId: {
+  roomid: {
     id: string;
     name: string;
     location: string;

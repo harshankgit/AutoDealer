@@ -6,7 +6,7 @@ import { verifyToken } from '@/lib/auth';
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const roomId = searchParams.get('roomId');
+    const roomid = searchParams.get('roomid') || searchParams.get('roomid'); // Handle both parameter names
     const brand = searchParams.get('brand');
     const minPrice = searchParams.get('minPrice');
     const maxPrice = searchParams.get('maxPrice');
@@ -15,8 +15,8 @@ export async function GET(request: Request) {
 
     const filters: any = {};
 
-    if (roomId) {
-      filters.roomid = roomId;
+    if (roomid) {
+      filters.roomid = roomid;
     }
     if (brand) {
       filters.brand = brand;
@@ -65,11 +65,11 @@ export async function POST(request: Request) {
       ownership_history: carData.ownership_history || carData.ownershipHistory,
       transmission: carData.transmission || carData.transmission,
       // Add other potential conversions
-      roomid: carData.roomid || carData.roomId,
+      roomid: carData.roomid || carData.roomid,
       adminid: carData.adminid || carData.adminid,
       created_at: carData.created_at || carData.createdAt,
       updated_at: carData.updated_at || carData.updatedAt,
-      availability: carData.availability || carData.availability,
+      availability: carData.availability || 'Available',
       images: carData.images || carData.images,
       specifications: carData.specifications || carData.specifications,
     };

@@ -26,11 +26,11 @@ interface Car {
   year: number;
   price: number;
   images: string[];
-  roomId: {
+  roomid: {
     id: string;
     name: string;
   };
-  adminid: {
+  adminid: string | {
     id: string;
     username: string;
   };
@@ -69,6 +69,7 @@ export default function ChatPage() {
   const [user, setUser] = useState<any>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [roomName, setRoomName] = useState<string>('Loading room...');
 
   useEffect(() => {
     if (!carId) return; // wait until param available
@@ -92,6 +93,39 @@ export default function ChatPage() {
 
       if (carResponse.ok) {
         setCar(carData.car);
+
+        // Fetch room details to get room name
+        if (carData.car?.roomid) {
+          const roomResponse = await fetch(`/api/rooms/${carData.car.roomid}`);
+          const roomData = await roomResponse.json();
+
+          if (roomResponse.ok) {
+            setRoomName(roomData.room?.name || 'Unknown Room');
+          } else {
+            setRoomName('Unknown Room');
+          }
+        }
+
+        // Fetch admin details to get dealer name
+        if (carData.car?.adminid) {
+          try {
+            const adminResponse = await fetch(`/api/users/${carData.car.adminid}`);
+            const adminData = await adminResponse.json();
+
+            if (adminResponse.ok && adminData.user) {
+              // Update the car object to include admin info
+              setCar(prev => prev ? {
+                ...prev,
+                adminid: {
+                  id: adminData.user.id,
+                  username: adminData.user.username
+                }
+              } : null);
+            }
+          } catch (error) {
+            console.error('Failed to fetch admin details:', error);
+          }
+        }
       } else {
         setCar(null);
         setError(carData.error || "Car not found");
@@ -184,8 +218,9 @@ export default function ChatPage() {
         fileType = uploadData.fileType;
       }
 
-      // Ensure receiver exists
-      if (!car.adminid?.id) {
+      // Ensure receiver exists - car.adminid can be a string ID or an object
+      const receiverId = typeof car.adminid === 'object' ? car.adminid.id : car.adminid;
+      if (!receiverId) {
         setError("Receiver (dealer) not available for this car.");
         setIsSending(false);
         return;
@@ -199,7 +234,7 @@ export default function ChatPage() {
         },
         body: JSON.stringify({
           carId: car.id,
-          receiverId: car.adminid.id,
+          receiverId,
           message: newMessage || null,
           fileId,
           fileName,
@@ -333,11 +368,11 @@ export default function ChatPage() {
 
                 <div className="pt-2 border-t">
                   <p className="text-sm text-gray-600">
-                    <strong>Showroom:</strong> {car.roomId.name}
+                    <strong>Showroom:</strong> {roomName}
                   </p>
                   <p className="text-sm text-gray-600">
                     <strong>Dealer:</strong>{" "}
-                    {car.adminid?.username || "Unknown Dealer"}
+                    {typeof car.adminid === 'object' ? car.adminid.username : "Car Dealer"}
                   </p>
                 </div>
               </CardContent>
@@ -350,7 +385,7 @@ export default function ChatPage() {
               <CardHeader className="border-b">
                 <CardTitle className="flex items-center">
                   <MessageCircle className="h-5 w-5 mr-2" />
-                  Chat with {car.adminid?.username || "Dealer"}
+                  Chat with {typeof car.adminid === 'object' ? car.adminid.username : "Car Dealer"}
                 </CardTitle>
               </CardHeader>
 

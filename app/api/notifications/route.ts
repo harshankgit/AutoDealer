@@ -1,55 +1,50 @@
 import { NextResponse } from 'next/server';
-import { userServices } from '@/lib/supabase/services/userService';
-import pusher from '@/lib/pusher';
 import { verifyToken } from '@/lib/auth';
+import { notificationServices } from '@/lib/supabase/services/generalServices';
+import { userServices } from '@/lib/supabase/services/userService';
 
-export async function POST(request: Request) {
+export async function GET(request: Request) {
   try {
     const token = request.headers.get('authorization')?.replace('Bearer ', '');
     const decoded = verifyToken(token || '');
 
-    if (!decoded || decoded.role !== 'admin') {
-      return NextResponse.json(
-        { error: 'Unauthorized - Admin access required' },
-        { status: 401 }
-      );
+    if (!decoded) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { type, message, userId, carId } = await request.json();
+    // Get user's notifications
+    const notifications = await notificationServices.getNotificationsByUser(decoded.userId);
 
-    // Validate required fields
-    if (!type || !message) {
-      return NextResponse.json(
-        { error: 'Missing required fields: type, message' },
-        { status: 400 }
-      );
-    }
-
-    // Prepare notification data
-    const notification = {
-      id: Date.now().toString(),
-      type,
-      message,
-      userId,
-      carId,
-      createdAt: new Date(),
-      read: false,
-    };
-
-    // Trigger Pusher event to notify the admin
-    await pusher.trigger(`notification-${decoded.userId}`, 'new-notification', {
-      notification,
-    });
-
-    return NextResponse.json({
-      message: 'Notification sent successfully',
-      notification,
-    });
+    return NextResponse.json({ notifications });
   } catch (error) {
-    console.error('Notification API error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    console.error('Get notifications error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+export async function PUT(request: Request) {
+  try {
+    const token = request.headers.get('authorization')?.replace('Bearer ', '');
+    const decoded = verifyToken(token || '');
+
+    if (!decoded) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const notificationId = searchParams.get('notificationId');
+    
+    if (notificationId) {
+      // Mark specific notification as read
+      const updatedNotification = await notificationServices.markNotificationAsRead(notificationId);
+      return NextResponse.json({ notification: updatedNotification });
+    }
+
+    // If no notificationId, assume it's for marking all as read
+    const result = await notificationServices.markAllNotificationsAsRead(decoded.userId);
+    return NextResponse.json({ message: 'All notifications marked as read', count: result });
+  } catch (error) {
+    console.error('Update notification error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

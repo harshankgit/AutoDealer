@@ -1,29 +1,48 @@
 import { NextResponse } from 'next/server';
-import { roomServices } from '@/lib/supabase/services/generalServices';
-import { carServices } from '@/lib/supabase/services/carService';
-import { userServices } from '@/lib/supabase/services/userService';
-import { visitServices } from '@/lib/supabase/services/generalServices';
+import { verifyToken } from '@/lib/auth';
+import {
+  roomServices,
+  visitServices
+} from '@/lib/supabase/services/generalServices';
+import {
+  carServices
+} from '@/lib/supabase/services/carService';
+import {
+  userServices
+} from '@/lib/supabase/services/userService';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    // Get all stats in parallel to improve performance
-    const [
-      totalUsers,
-      totalShowrooms,
-      totalCars,
-      totalVisits,
-      monthlyVisits,
-      userGrowthData,
-      carDistributionData
-    ] = await Promise.all([
+    // Extract token from headers
+    const authHeader = request.headers.get('authorization');
+    let userId = null;
+
+    if (authHeader) {
+      const token = authHeader.replace('Bearer ', '');
+      const decoded = verifyToken(token);
+      if (decoded) userId = decoded.userId;
+    }
+
+    // Get total counts
+    const [totalUsers, allShowrooms, totalCars, totalVisits] = await Promise.all([
       userServices.getAllUsersCount(),
-      roomServices.getActiveRooms().then(rooms => rooms.length),
+      roomServices.getAllRooms(),
       carServices.getAllCarsCount(),
-      visitServices.getGlobalVisitCount(),
-      visitServices.getMonthlyVisitsData(),
-      getUserGrowthData(),
-      getCarDistributionData()
+      visitServices.getGlobalVisitCount()
     ]);
+
+    const totalShowrooms = allShowrooms.length;
+
+    // Get monthly visits data for charts (last 12 months)
+    const monthlyVisits = await visitServices.getMonthlyVisitsData();
+
+    // Get user growth data (last 12 months)
+    const allUsers = await userServices.getAllUsers();
+    const userGrowthData: any[] = []; // Placeholder - implement actual user growth data calculation if needed
+
+    // Get car distribution data by brand/type
+    const allCars = await carServices.getAllCars();
+    const carDistributionData: any[] = []; // Placeholder - implement actual car distribution data calculation if needed
 
     return NextResponse.json({
       totalUsers: totalUsers || 0,
@@ -35,52 +54,10 @@ export async function GET() {
       carDistributionData: carDistributionData || []
     });
   } catch (error) {
-    console.error('Homepage stats error:', error);
+    console.error('Error in homepage stats API:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
     );
-  }
-}
-
-// Get user growth data by month
-async function getUserGrowthData(): Promise<{ month: string; count: number }[]> {
-  try {
-    // This would be implemented with actual query to get users by registration month
-    // For now, return sample data based on actual user count
-    const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-    ];
-    
-    // Generate realistic user growth data based on total users
-    const userData: { month: string; count: number }[] = months.map((month, index) => ({
-      month,
-      count: Math.floor(Math.random() * 50) + 10 // Random sample data
-    }));
-    
-    return userData;
-  } catch (error) {
-    console.error('Error fetching user growth data:', error);
-    return [];
-  }
-}
-
-// Get car distribution data by brand
-async function getCarDistributionData(): Promise<{ brand: string; count: number }[]> {
-  try {
-    // This would be implemented with actual query to get cars by brand
-    // For now, return sample data
-    const brands = ['Toyota', 'Honda', 'Ford', 'BMW', 'Mercedes', 'Audi'];
-    
-    const carData: { brand: string; count: number }[] = brands.map((brand, index) => ({
-      brand,
-      count: Math.floor(Math.random() * 100) + 20 // Random sample data
-    }));
-    
-    return carData;
-  } catch (error) {
-    console.error('Error fetching car distribution data:', error);
-    return [];
   }
 }

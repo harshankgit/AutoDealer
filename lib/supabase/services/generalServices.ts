@@ -57,6 +57,20 @@ export interface Chat {
   created_at: string;
 }
 
+// Define the Notification type
+export interface Notification {
+  id: string;
+  recipientid: string; // The user who receives the notification
+  type: string; // 'chat', 'booking', 'system', 'car_update', etc.
+  title: string;
+  message: string;
+  senderid?: string; // Who sent the notification (optional)
+  related_entity_id?: string; // ID of related entity (car, booking, etc.)
+  read: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 // Define the File type
 export interface File {
   id: string;
@@ -90,12 +104,12 @@ export const roomServices = {
     }
   },
 
-  async getRoomById(roomId: string): Promise<Room | null> {
+  async getRoomById(roomid: string): Promise<Room | null> {
     try {
       const { data, error } = await supabase
         .from('rooms')
         .select('*')
-        .eq('id', roomId)
+        .eq('id', roomid)
         .single();
 
       if (error) {
@@ -189,12 +203,12 @@ export const roomServices = {
     }
   },
 
-  async updateRoom(roomId: string, roomData: Partial<Room>): Promise<Room | null> {
+  async updateRoom(roomid: string, roomData: Partial<Room>): Promise<Room | null> {
     try {
       const { data, error } = await supabase
         .from('rooms')
         .update(roomData)
-        .eq('id', roomId)
+        .eq('id', roomid)
         .select()
         .single();
 
@@ -210,12 +224,12 @@ export const roomServices = {
     }
   },
 
-  async updateRoomStatus(roomId: string, isActive: boolean): Promise<Room | null> {
+  async updateRoomStatus(roomid: string, isActive: boolean): Promise<Room | null> {
     try {
       const { data, error } = await supabase
         .from('rooms')
         .update({ is_active: isActive })
-        .eq('id', roomId)
+        .eq('id', roomid)
         .select()
         .single();
 
@@ -231,12 +245,12 @@ export const roomServices = {
     }
   },
 
-  async deleteRoom(roomId: string): Promise<boolean> {
+  async deleteRoom(roomid: string): Promise<boolean> {
     try {
       const { error } = await supabase
         .from('rooms')
         .delete()
-        .eq('id', roomId);
+        .eq('id', roomid);
 
       if (error) {
         console.error('Error deleting room:', error);
@@ -471,12 +485,12 @@ export const chatServices = {
     }
   },
 
-  async getChatsByRoom(roomId: string): Promise<Chat[]> {
+  async getChatsByRoom(roomid: string): Promise<Chat[]> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await getSupabaseServiceRole()
         .from('chats')
         .select('*, sender:users(username)')
-        .eq('roomid', roomId)
+        .eq('roomid', roomid)
         .order('timestamp', { ascending: false });
 
       if (error) {
@@ -507,6 +521,122 @@ export const chatServices = {
     } catch (error) {
       console.error('Error in getAllChats:', error);
       return [];
+    }
+  }
+};
+
+// Notification Service Functions
+export const notificationServices = {
+  async createNotification(notificationData: Omit<Notification, 'id' | 'created_at'>): Promise<Notification | null> {
+    try {
+      const { data, error } = await getSupabaseServiceRole()
+        .from('notifications')
+        .insert([notificationData])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating notification:', error);
+        throw new Error(error.message);
+      }
+
+      return data as Notification;
+    } catch (error) {
+      console.error('Error in createNotification:', error);
+      return null;
+    }
+  },
+
+  async getNotificationsByUser(userId: string): Promise<Notification[]> {
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('recipientid', userId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error getting notifications by user:', error);
+        return [];
+      }
+
+      return data as Notification[];
+    } catch (error) {
+      console.error('Error in getNotificationsByUser:', error);
+      return [];
+    }
+  },
+
+  async markNotificationAsRead(notificationId: string): Promise<Notification | null> {
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .update({ read: true, updated_at: new Date().toISOString() })
+        .eq('id', notificationId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error marking notification as read:', error);
+        return null;
+      }
+
+      return data as Notification;
+    } catch (error) {
+      console.error('Error in markNotificationAsRead:', error);
+      return null;
+    }
+  },
+
+  async markAllNotificationsAsRead(userId: string): Promise<number> {
+    try {
+      // First, get the count of notifications that will be marked as read
+      const { count, error: countError } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('recipientid', userId)
+        .eq('read', false); // Only count unread notifications
+
+      if (countError) {
+        console.error('Error getting notification count:', countError);
+        return 0;
+      }
+
+      // Then update all notifications for the user to be marked as read
+      const { error } = await supabase
+        .from('notifications')
+        .update({ read: true, updated_at: new Date().toISOString() })
+        .eq('recipientid', userId);
+
+      if (error) {
+        console.error('Error marking all notifications as read:', error);
+        return 0;
+      }
+
+      return count || 0;
+    } catch (error) {
+      console.error('Error in markAllNotificationsAsRead:', error);
+      return 0;
+    }
+  },
+
+  async getUnreadNotificationsCount(userId: string): Promise<number> {
+    try {
+      const { count, error } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('recipientid', userId)
+        .eq('read', false);
+
+      if (error) {
+        console.error('Error getting unread notifications count:', error);
+        return 0;
+      }
+
+      return count || 0;
+    } catch (error) {
+      console.error('Error in getUnreadNotificationsCount:', error);
+      return 0;
     }
   }
 };

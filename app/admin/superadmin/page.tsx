@@ -53,7 +53,7 @@ interface Car {
     topSpeed?: string;
     features?: string[];
   };
-  roomId: {
+  roomid: {
     id: string;
     name: string;
   };
@@ -75,7 +75,7 @@ interface Booking {
     username: string;
     email: string;
   };
-  roomId: {
+  roomid: {
     name: string;
   };
   bookingDetails: {
@@ -101,7 +101,7 @@ interface Payment {
     brand: string;
     model: string;
   };
-  roomId: {
+  roomid: {
     name: string;
   };
   amount: number;
@@ -306,13 +306,13 @@ export default function SuperAdminDashboard() {
     }
   };
 
-  const deleteRoom = async (roomId: string) => {
+  const deleteRoom = async (roomid: string) => {
     if (!window.confirm('Are you sure you want to delete this room? This action cannot be undone.')) {
       return;
     }
 
     try {
-      const response = await fetch(`/api/superadmin/rooms/${roomId}`, {
+      const response = await fetch(`/api/superadmin/rooms/${roomid}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${user?.token}`, // Use context user token
@@ -321,7 +321,7 @@ export default function SuperAdminDashboard() {
       });
 
       if (response.ok) {
-        setRooms(rooms.filter(room => room.id !== roomId));
+        setRooms(rooms.filter(room => room.id !== roomid));
         setError('Room deleted successfully');
       } else {
         const errorData = await response.json();
@@ -719,7 +719,7 @@ export default function SuperAdminDashboard() {
                               </div>
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{car.roomId.name}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{typeof car.roomid === 'object' ? car.roomid.id : car.roomid}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                             ₹{car.price.toLocaleString()}
                           </td>
@@ -796,7 +796,7 @@ export default function SuperAdminDashboard() {
                             <div className="text-sm text-gray-500 dark:text-gray-400">{booking.carId.brand} {booking.carId.model}</div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{booking.userId.username}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{booking.roomId.name}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{typeof booking.roomid === 'object' ? booking.roomid.name : booking.roomid}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{booking.bookingDetails.phone}</td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${

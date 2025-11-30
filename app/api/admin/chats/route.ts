@@ -41,7 +41,7 @@ export async function GET(request: Request) {
     // This requires restructuring the data compared to MongoDB's approach
 
     // Group messages by roomid to create chat summaries
-    const chatsByRoom: { [roomId: string]: any[] } = {};
+    const chatsByRoom: { [roomid: string]: any[] } = {};
     chats.forEach(chat => {
       if (!chatsByRoom[chat.roomid]) {
         chatsByRoom[chat.roomid] = [];
@@ -50,13 +50,13 @@ export async function GET(request: Request) {
     });
 
     // Format the chat summaries to include detailed information
-    const chatSummaries = await Promise.all(Object.entries(chatsByRoom).map(async ([roomId, roomChats]) => {
+    const chatSummaries = await Promise.all(Object.entries(chatsByRoom).map(async ([roomid, roomChats]) => {
       // Get room details
-      const room = await roomServices.getRoomById(roomId);
+      const room = await roomServices.getRoomById(roomid);
 
       // Get car details associated with this room (if any)
       const cars = await carServices.getCarsByAdmin(decoded.userId); // This might not be the right approach
-      const car = cars.find(c => c.roomid === roomId); // Find a car associated with the room
+      const car = cars.find(c => c.roomid === roomid); // Find a car associated with the room
 
       // Get user details for the sender of the last message
       const lastMessage = roomChats.length > 0 ? roomChats[0] : null; // Assuming latest first, adjust if needed
@@ -66,8 +66,8 @@ export async function GET(request: Request) {
       }
 
       return {
-        id: roomId,
-        roomid: roomId,
+        id: roomid,
+        roomid: roomid,
         car: car ? {
           id: car.id,
           title: car.title,

@@ -43,7 +43,7 @@ interface Chat {
     username: string;
     email: string;
   } | null;
-  roomId: {
+  roomid: {
     id: string;
     name: string;
   } | null;
@@ -284,9 +284,9 @@ export default function AdminChatPage({ params }: { params: { chatId: string } }
                         {chat.carId ? `${chat.carId.year} ${chat.carId.brand} ${chat.carId.model}` : 'Unknown Car'}
                       </span>
                     </div>
-                    {chat.roomId && (
+                    {chat.roomid && (
                       <p className="text-sm text-gray-500 dark:text-gray-400">
-                        Room: {chat.roomId.name}
+                        Room: {chat.roomid.name} (ID: {chat.roomid.id})
                       </p>
                     )}
                   </div>

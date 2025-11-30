@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server';
-import crypto from 'crypto';
 import { verifyToken } from '@/lib/auth';
+import Pusher from 'pusher';
 
 export async function POST(request: Request) {
   try {
-    // Verify user is authenticated
+    // Get the request body
+    const body = await request.json();
+    const { socket_id, channel_name } = body;
+
+    // Verify the user's token from headers
     const authHeader = request.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -12,39 +16,39 @@ export async function POST(request: Request) {
 
     const token = authHeader.substring(7);
     const decoded = verifyToken(token);
-    
+
     if (!decoded) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get the socketid and channel_name from the request body
-    const body = await request.text();
-    const params = new URLSearchParams(body);
-    const socketId = params.get('socketid');
-    const channelName = params.get('channel_name');
+    // Initialize Pusher server instance
+    const pusher = new Pusher({
+      appId: process.env.PUSHER_APPid!,
+      key: process.env.PUSHER_KEY!,
+      secret: process.env.PUSHER_SECRET!,
+      cluster: process.env.PUSHER_CLUSTER!,
+      useTLS: true,
+    });
 
-    if (!socketId || !channelName) {
-      return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 });
+    if (!socket_id || !channel_name) {
+      return NextResponse.json({ error: 'Missing socket_id or channel_name' }, { status: 400 });
     }
 
-    // Check if the channel name follows our convention (e.g., "private-notification-{userId}")
+    // Verify that the user is authorized to subscribe to this channel
     const userId = decoded.userId;
-    const expectedChannelName = `notification-${userId}`;
-    
-    if (!channelName.endsWith(expectedChannelName)) {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+    const expectedChannel = `notification-${userId}`;
+
+    if (channel_name !== expectedChannel) {
+      return NextResponse.json({ error: 'Forbidden: Not authorized to access this channel' }, { status: 403 });
     }
 
-    // Generate the Pusher signature
-    const stringToSign = `${socketId}:${channelName}`;
-    const signature = crypto
-      .createHmac('sha256', process.env.PUSHER_SECRET!)
-      .update(stringToSign)
-      .digest('hex');
+    // Authenticate the user for this channel
+    const authResponse = pusher.authenticateUser(socket_id, {
+      id: userId,
+      username: decoded.username || 'User',
+    });
 
-    const auth = `${process.env.PUSHER_KEY!}:${signature}`;
-
-    return NextResponse.json({ auth });
+    return NextResponse.json(authResponse);
   } catch (error) {
     console.error('Pusher auth error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

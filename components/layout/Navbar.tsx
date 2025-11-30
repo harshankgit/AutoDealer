@@ -5,8 +5,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/theme-toggle';
-import { Car, LogOut, User, Menu, X, MessageCircle, Bell } from 'lucide-react';
+import { Car, LogOut, User, Menu, X, MessageCircle, Bell, HelpCircle } from 'lucide-react';
 import { useUser } from '@/context/user-context'; // Corrected import path
+import NotificationBadge from '@/components/realtime/NotificationBadge';
 
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -71,15 +72,8 @@ export default function Navbar() {
                         </Button>
                       </Link>
                       {/* Notification badge for user notifications */}
-                      <Link href="/chats"> {/* Link directly to the chat page */}
-                        <div className="relative">
-                          <Button variant="ghost" size="sm">
-                            <Bell className="h-5 w-5" />
-                          </Button>
-                          <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-xs flex items-center justify-center text-white">
-                            3
-                          </span>
-                        </div>
+                      <Link href="/notifications">
+                        <NotificationBadge />
                       </Link>
                     </>
                   )}
@@ -90,6 +84,13 @@ export default function Navbar() {
 
                   <ThemeToggle />
 
+                  <Link href="/help">
+                    <Button variant="ghost" size="sm">
+                      <HelpCircle className="h-4 w-4 mr-2" />
+                      Help
+                    </Button>
+                  </Link>
+
                   <Button onClick={handleLogout} variant="outline" size="sm">
                     <LogOut className="h-4 w-4 mr-2" />
                     Logout
@@ -98,6 +99,12 @@ export default function Navbar() {
               </div>
             ) : (
               <div className="flex items-center space-x-3">
+                <Link href="/help">
+                  <Button variant="ghost" size="sm">
+                    <HelpCircle className="h-4 w-4 mr-2" />
+                    Help
+                  </Button>
+                </Link>
                 <ThemeToggle />
                 <Link href="/login">
                   <Button variant="ghost" size="sm">Login</Button>
@@ -181,6 +188,14 @@ export default function Navbar() {
                     </Link>
                   )}
 
+                  <Link
+                    href="/help"
+                    className="block px-3 py-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Help & Support
+                  </Link>
+
                   <div className="px-3 py-2 text-sm text-gray-600 dark:text-gray-400">
                     Welcome, {user.username}
                   </div>
@@ -197,6 +212,13 @@ export default function Navbar() {
                 </>
               ) : (
                 <>
+                  <Link
+                    href="/help"
+                    className="block px-3 py-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Help & Support
+                  </Link>
                   <Link
                     href="/login"
                     className="block px-3 py-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium"

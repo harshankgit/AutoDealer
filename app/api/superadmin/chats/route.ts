@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     const allChats = await chatServices.getAllChats();
 
     // Group messages by room to create chat summaries (since in Supabase each row is an individual message)
-    const chatsByRoom: { [roomId: string]: any[] } = {};
+    const chatsByRoom: { [roomid: string]: any[] } = {};
     allChats.forEach(chat => {
       if (!chatsByRoom[chat.roomid]) {
         chatsByRoom[chat.roomid] = [];
@@ -27,11 +27,11 @@ export async function GET(request: Request) {
     });
 
     // Format the chat summaries to include last message details
-    const chatSummaries = Object.entries(chatsByRoom).map(([roomId, roomChats]) => {
+    const chatSummaries = Object.entries(chatsByRoom).map(([roomid, roomChats]) => {
       const lastMessage = roomChats.length > 0 ? roomChats[roomChats.length - 1] : null;
 
       return {
-        roomid: roomId,
+        roomid: roomid,
         lastMessage: lastMessage ? {
           message: lastMessage.message,
           timestamp: lastMessage.timestamp,

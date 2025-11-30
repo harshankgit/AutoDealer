@@ -56,7 +56,7 @@ export async function GET(request: Request, { params }: { params: { chatId: stri
       );
     }
 
-    const roomId = chatMessages[0].roomid;
+    const roomid = chatMessages[0].roomid;
 
     // Only allow admin to access chats related to their room, unless superadmin
     if (decoded.role === 'admin') {
@@ -69,7 +69,7 @@ export async function GET(request: Request, { params }: { params: { chatId: stri
       }
 
       // Check if the chat's room belongs to admin's room
-      if (roomId !== adminRoom.id) {
+      if (roomid !== adminRoom.id) {
         return NextResponse.json(
           { error: 'Unauthorized - This chat does not belong to your room' },
           { status: 403 }
@@ -79,7 +79,7 @@ export async function GET(request: Request, { params }: { params: { chatId: stri
 
     // Format the chat for response, with each row as a separate message
     const formattedChat = {
-      roomid: roomId,
+      roomid: roomid,
       messages: chatMessages.map((msg) => {
         const messageData:MessageResponse = {
           id: msg.id,
@@ -117,7 +117,7 @@ export async function POST(request: Request, { params }: { params: { chatId: str
       );
     }
 
-    const roomId = params.chatId; // In the current code chatId might be the room ID
+    const roomid = params.chatId; // In the current code chatId might be the room ID
     const { message, fileId, fileName, fileType } = await request.json();
 
     if (!message && !fileId) {
@@ -138,7 +138,7 @@ export async function POST(request: Request, { params }: { params: { chatId: str
       }
 
       // Check if the room belongs to admin's room
-      if (roomId !== adminRoom.id) {
+      if (roomid !== adminRoom.id) {
         return NextResponse.json(
           { error: 'Unauthorized - This chat does not belong to your room' },
           { status: 403 }
@@ -148,7 +148,7 @@ export async function POST(request: Request, { params }: { params: { chatId: str
 
     // Create a new message in Supabase
     const newMessage = await chatServices.createChat({
-      roomid: roomId,
+      roomid: roomid,
       senderid: decoded.userId,
       message: message || '',
       timestamp: new Date().toISOString(),

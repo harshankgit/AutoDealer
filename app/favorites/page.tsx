@@ -22,10 +22,13 @@ interface Car {
   images: string[];
   condition: string;
   availability: string;
-  roomId: {
+  roomid?: string;
+  roomInfo?: {
     id: string;
     name: string;
     location: string;
+    description?: string;
+    image?: string;
   };
 }
 
@@ -62,16 +65,40 @@ export default function FavoritesPage() {
     }
 
     try {
-      const carPromises = favoriteIds.map(id => 
+      const carPromises = favoriteIds.map(id =>
         fetch(`/api/cars/${id}`).then(res => res.json())
       );
-      
+
       const carResults = await Promise.all(carPromises);
       const validCars = carResults
         .filter(result => result.car)
         .map(result => result.car);
-      
-      setFavoriteCars(validCars);
+
+      // Fetch room information for each unique room ID
+      const roomIds = Array.from(new Set(validCars.map(car => car.roomid))).filter(Boolean) as string[];
+      const roomMap: Record<string, any> = {};
+
+      if (roomIds.length > 0) {
+        for (const roomid of roomIds) {
+          try {
+            const response = await fetch(`/api/rooms/${roomid}`);
+            if (response.ok) {
+              const roomData = await response.json();
+              roomMap[roomid] = roomData.room;
+            }
+          } catch (err) {
+            console.error(`Failed to fetch room ${roomid}:`, err);
+          }
+        }
+      }
+
+      // Add room information to each car
+      const carsWithRoomInfo = validCars.map(car => ({
+        ...car,
+        roomInfo: roomMap[car.roomid || car.roomid] || null
+      }));
+
+      setFavoriteCars(carsWithRoomInfo);
     } catch (error) {
       setError('Failed to load favorite cars');
     } finally {
@@ -110,20 +137,20 @@ export default function FavoritesPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="text-center mb-12">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Heart className="h-8 w-8 text-red-600" />
+          <div className="w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Heart className="h-8 w-8 text-red-600 dark:text-red-400" />
           </div>
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-4">
             Your Favorite Cars
           </h1>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
             Keep track of cars you're interested in and compare them easily.
           </p>
         </div>
 
         {error && (
           <div className="max-w-2xl mx-auto mb-8">
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-center">
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg text-center">
               {error}
             </div>
           </div>
@@ -131,15 +158,15 @@ export default function FavoritesPage() {
 
         {favoriteCars.length === 0 ? (
           <div className="text-center py-16">
-            <Heart className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-600 mb-2">
+            <Heart className="h-16 w-16 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-600 dark:text-gray-300 mb-2">
               No favorite cars yet
             </h3>
-            <p className="text-gray-500 mb-6">
+            <p className="text-gray-500 dark:text-gray-400 mb-6">
               Start browsing cars and add them to your favorites by clicking the heart icon.
             </p>
             <Link href="/rooms">
-              <Button className="bg-blue-600 hover:bg-blue-700">
+              <Button className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800">
                 <Car className="h-4 w-4 mr-2" />
                 Browse Cars
               </Button>
@@ -148,7 +175,7 @@ export default function FavoritesPage() {
         ) : (
           <>
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
                 {favoriteCars.length} Favorite{favoriteCars.length !== 1 ? 's' : ''}
               </h2>
             </div>
@@ -179,36 +206,39 @@ export default function FavoritesPage() {
                   </div>
                   
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-lg group-hover:text-blue-600 transition-colors">
+                    <CardTitle className="text-lg text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                       {car.title}
                     </CardTitle>
-                    <div className="text-sm text-gray-500 space-y-1">
+                    <div className="text-sm text-gray-500 dark:text-gray-400 space-y-1">
                       <p>{car.year} • {car.brand} {car.model}</p>
-                      <p>From: {car.roomId.name} • {car.roomId.location}</p>
+                      <p>From: {car.roomInfo?.name || 'Showroom'}</p>
+                      {car.roomInfo?.location && (
+                        <p className="text-xs text-gray-400 dark:text-gray-500">{car.roomInfo.location}</p>
+                      )}
                     </div>
                   </CardHeader>
                   
                   <CardContent className="pt-0">
                     <div className="space-y-3">
-                      <div className="text-2xl font-bold text-blue-600">
+                      <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                         {formatPrice(car.price)}
                       </div>
-                      
-                      <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
+
+                      <div className="grid grid-cols-2 gap-2 text-sm text-gray-600 dark:text-gray-400">
                         <div className="flex items-center">
-                          <Calendar className="h-4 w-4 mr-1" />
+                          <Calendar className="h-4 w-4 mr-1 text-gray-600 dark:text-gray-400" />
                           {car.mileage.toLocaleString()} miles
                         </div>
                         <div className="flex items-center">
-                          <Fuel className="h-4 w-4 mr-1" />
+                          <Fuel className="h-4 w-4 mr-1 text-gray-600 dark:text-gray-400" />
                           {car.fuelType}
                         </div>
                         <div className="flex items-center">
-                          <Users className="h-4 w-4 mr-1" />
+                          <Users className="h-4 w-4 mr-1 text-gray-600 dark:text-gray-400" />
                           {car.ownershipHistory}
                         </div>
                         <div className="flex items-center">
-                          <Badge variant="outline" className="text-xs">
+                          <Badge variant="outline" className="text-xs dark:border-gray-600">
                             {car.condition}
                           </Badge>
                         </div>
@@ -234,36 +264,36 @@ export default function FavoritesPage() {
             </div>
 
             {/* Summary Stats */}
-            <div className="mt-16 bg-white rounded-2xl shadow-lg p-8">
-              <h3 className="text-xl font-bold text-gray-900 mb-6 text-center">
+            <div className="mt-16 bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6 text-center">
                 Your Favorites Summary
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-600 mb-1">
+                  <div className="text-2xl font-bold text-blue-600 dark:text-blue-400 mb-1">
                     {favoriteCars.length}
                   </div>
-                  <div className="text-sm text-gray-600">Total Favorites</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">Total Favorites</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-green-600 mb-1">
+                  <div className="text-2xl font-bold text-green-600 dark:text-green-400 mb-1">
                     {favoriteCars.filter(car => car.availability === 'Available').length}
                   </div>
-                  <div className="text-sm text-gray-600">Available</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">Available</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-purple-600 mb-1">
+                  <div className="text-2xl font-bold text-purple-600 dark:text-purple-400 mb-1">
                     {formatPrice(
                       favoriteCars.reduce((avg, car) => avg + car.price, 0) / favoriteCars.length || 0
                     )}
                   </div>
-                  <div className="text-sm text-gray-600">Average Price</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">Average Price</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-orange-600 mb-1">
-                    {new Set(favoriteCars.map(car => car.roomId.id)).size}
+                  <div className="text-2xl font-bold text-orange-600 dark:text-orange-400 mb-1">
+                    {new Set(favoriteCars.map(car => car.roomInfo?.id)).size}
                   </div>
-                  <div className="text-sm text-gray-600">Different Showrooms</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">Different Showrooms</div>
                 </div>
               </div>
             </div>

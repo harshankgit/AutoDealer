@@ -50,7 +50,7 @@ export default function AdminDashboard() {
       username: string;
       email: string;
     } | string; // Could be string if not populated
-    roomId: string;
+    roomid: string;
     status: string;
     bookingDetails: {
       phone: string;
@@ -60,14 +60,59 @@ export default function AdminDashboard() {
     updatedAt: string;
   }
 
+  // Define ChatMessage interface
+  interface ChatMessage {
+    id: string;
+    roomid: string;
+    car?: {
+      id: string;
+      title: string;
+      images?: string[];
+      room: string;
+    };
+    user?: {
+      id: string;
+      username: string;
+      email: string;
+    };
+    lastMessage?: {
+      message: string;
+      timestamp: string;
+      senderId: string;
+    };
+    messageCount: number;
+    updatedAt: string;
+  }
+
   const [cars, setCars] = useState<Car[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [stats, setStats] = useState({
     totalCars: 0,
     availableCars: 0,
     soldCars: 0,
     totalViews: 0,
+    totalBookings: 0,
+    confirmedBookings: 0,
+    pendingBookings: 0,
+    totalRevenue: 0,
   });
+
+  // Add state for chart data
+  const [chartData, setChartData] = useState({
+    monthlyData: [],
+    availabilityData: {
+      available: 0,
+      sold: 0,
+      reserved: 0,
+    },
+    yearlySummary: {
+      totalBookings: 0,
+      totalRevenue: 0,
+      year: new Date().getFullYear(),
+    }
+  });
+  const [chartLoading, setChartLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [currentBookingId, setCurrentBookingId] = useState<string | null>(null);
@@ -75,7 +120,7 @@ export default function AdminDashboard() {
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const router = useRouter();
   const { user, loading } = useUser(); // Use context instead of local state
-  const { notifications, unreadCount, addNotification } = useRealtimeNotifications();
+  const { notifications, unreadCount, addNotification, markAsRead, markAllAsRead } = useRealtimeNotifications();
 
   useEffect(() => {
     if (!loading && !user) {
@@ -116,7 +161,7 @@ export default function AdminDashboard() {
         if (roomData.room) {
           // Fetch cars and bookings in parallel
           const [carsResponse, bookingsResponse] = await Promise.all([
-            fetch(`/api/cars?roomId=${roomData.room.id}`, {
+            fetch(`/api/cars?roomid=${roomData.room.id}`, {
               headers: { 'Authorization': `Bearer ${user?.token}` },
             }),
             fetch('/api/admin/bookings', {
@@ -138,6 +183,10 @@ export default function AdminDashboard() {
               availableCars,
               soldCars,
               totalViews: totalCars * 15, // Mock data
+              totalBookings: 0,
+              confirmedBookings: 0,
+              pendingBookings: 0,
+              totalRevenue: 0,
             });
           }
           
@@ -145,6 +194,59 @@ export default function AdminDashboard() {
             const bookingsData = await bookingsResponse.json();
             setBookings(bookingsData.bookings || []);
           }
+
+          // Fetch dashboard stats
+          const statsResponse = await fetch('/api/admin/dashboard/stats', {
+            headers: { 'Authorization': `Bearer ${user?.token}` },
+          });
+
+          if (statsResponse.ok) {
+            const statsData = await statsResponse.json();
+            setStats(statsData.stats || {
+              totalCars: 0,
+              availableCars: 0,
+              soldCars: 0,
+              totalViews: 0,
+              totalBookings: 0,
+              confirmedBookings: 0,
+              pendingBookings: 0,
+              totalRevenue: 0,
+            });
+          }
+
+          // Fetch chat messages as well
+          const chatResponse = await fetch('/api/admin/chats', {
+            headers: { 'Authorization': `Bearer ${user?.token}` },
+          });
+
+          if (chatResponse.ok) {
+            const chatData = await chatResponse.json();
+            setChatMessages(chatData.chats || []);
+          }
+
+          // Fetch chart data
+          setChartLoading(true);
+          const chartResponse = await fetch('/api/admin/dashboard/chart', {
+            headers: { 'Authorization': `Bearer ${user?.token}` },
+          });
+
+          if (chartResponse.ok) {
+            const chartData = await chartResponse.json();
+            setChartData(chartData.chartData || {
+              monthlyData: [],
+              availabilityData: {
+                available: 0,
+                sold: 0,
+                reserved: 0,
+              },
+              yearlySummary: {
+                totalBookings: 0,
+                totalRevenue: 0,
+                year: new Date().getFullYear(),
+              }
+            });
+          }
+          setChartLoading(false);
         }
       }
     } catch (error) {
@@ -247,7 +349,7 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 dark:from-gray-900 dark:to-gray-800">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
@@ -267,8 +369,8 @@ export default function AdminDashboard() {
                 type: n.type || 'notification'
               }))}
               unreadCount={unreadCount}
-              onMarkAsRead={() => {}}
-              onMarkAllAsRead={() => {}}
+              onMarkAsRead={markAsRead}
+              onMarkAllAsRead={markAllAsRead}
               onNotificationClick={() => {}}
             />
           </div>
@@ -301,10 +403,11 @@ export default function AdminDashboard() {
         ) : (
           /* Dashboard with Room */
           <Tabs defaultValue="overview" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="cars">Cars</TabsTrigger>
               <TabsTrigger value="room">Showroom</TabsTrigger>
+              <TabsTrigger value="notifications">Notifications</TabsTrigger>
               <TabsTrigger value="messages">Messages</TabsTrigger>
             </TabsList>
 
@@ -431,6 +534,145 @@ export default function AdminDashboard() {
                   </CardContent>
                 </Card>
               )}
+
+              {/* Charts Section */}
+              <div className="mt-8">
+                <Card className="bg-white dark:bg-gray-800">
+                  <CardHeader>
+                    <CardTitle className="dark:text-white">Performance Overview</CardTitle>
+                    <CardDescription className="dark:text-gray-300">
+                      Monthly bookings and revenue for {chartData.yearlySummary.year}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                      {/* Monthly Bookings Chart */}
+                      <div>
+                        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Monthly Bookings</h3>
+                        <div className="h-64 flex items-end space-x-2 justify-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                          {chartLoading ? (
+                            <div className="flex items-center justify-center h-full">
+                              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                            </div>
+                          ) : chartData.monthlyData.length > 0 ? (
+                            chartData.monthlyData.map((monthData, index) => {
+                              // Calculate max value to scale the bars
+                              const maxValue = Math.max(...chartData.monthlyData.map(m => (m as any).bookings || 0), 1);
+                              const barHeight = ((monthData as any).bookings / maxValue) * 200; // Max height of 200px
+
+                              return (
+                                <div key={index} className="flex flex-col items-center flex-1">
+                                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                    {(monthData as any).monthName}
+                                  </div>
+                                  <div
+                                    className="w-6 bg-blue-500 rounded-t hover:bg-blue-600 transition-colors"
+                                    style={{ height: `${barHeight}px` }}
+                                    title={`${(monthData as any).bookings} bookings in ${(monthData as any).monthName}`}
+                                  ></div>
+                                  <div className="text-xs mt-1 text-gray-600 dark:text-gray-300">
+                                    {(monthData as any).bookings}
+                                  </div>
+                                </div>
+                              );
+                            })
+                          ) : (
+                            <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">
+                              No data available
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Availability Chart */}
+                      <div>
+                        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Car Availability</h3>
+                        <div className="flex items-center justify-center h-64">
+                          {chartLoading ? (
+                            <div className="flex items-center justify-center h-full">
+                              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-center w-full">
+                              <div className="relative w-48 h-48">
+                                {/* Simple pie chart visualization */}
+                                <div
+                                  className="absolute top-0 left-0 w-full h-full rounded-full border-8 border-green-500"
+                                  style={{
+                                    clipPath: `inset(0 0 ${100 - (chartData.availabilityData.available / (chartData.availabilityData.available + chartData.availabilityData.sold + chartData.availabilityData.reserved || 1) * 100)}% 0)`
+                                  }}
+                                ></div>
+                                <div
+                                  className="absolute top-0 left-0 w-full h-full rounded-full border-8 border-yellow-500"
+                                  style={{
+                                    clipPath: `inset(${(chartData.availabilityData.available / (chartData.availabilityData.available + chartData.availabilityData.sold + chartData.availabilityData.reserved || 1) * 100)}% 0 0 0)`
+                                  }}
+                                ></div>
+                                <div
+                                  className="absolute top-0 left-0 w-full h-full rounded-full border-8 border-red-500"
+                                  style={{
+                                    clipPath: `inset(${(chartData.availabilityData.available + chartData.availabilityData.sold) / (chartData.availabilityData.available + chartData.availabilityData.sold + chartData.availabilityData.reserved || 1) * 100}% 0 0 ${100 - (chartData.availabilityData.available + chartData.availabilityData.sold) / (chartData.availabilityData.available + chartData.availabilityData.sold + chartData.availabilityData.reserved || 1) * 100}% )`
+                                  }}
+                                ></div>
+
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                  <div className="text-center">
+                                    <div className="text-2xl font-bold dark:text-white">
+                                      {chartData.availabilityData.available + chartData.availabilityData.sold + chartData.availabilityData.reserved}
+                                    </div>
+                                    <div className="text-sm text-gray-500 dark:text-gray-400">Total Cars</div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="ml-8">
+                                <div className="flex items-center mb-2">
+                                  <div className="w-4 h-4 bg-green-500 rounded mr-2"></div>
+                                  <span className="text-sm">Available: {chartData.availabilityData.available}</span>
+                                </div>
+                                <div className="flex items-center mb-2">
+                                  <div className="w-4 h-4 bg-yellow-500 rounded mr-2"></div>
+                                  <span className="text-sm">Reserved: {chartData.availabilityData.reserved}</span>
+                                </div>
+                                <div className="flex items-center">
+                                  <div className="w-4 h-4 bg-red-500 rounded mr-2"></div>
+                                  <span className="text-sm">Sold: {chartData.availabilityData.sold}</span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Stats Summary */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
+                      <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                        <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                          {chartData.yearlySummary.totalBookings}
+                        </div>
+                        <div className="text-sm text-gray-600 dark:text-gray-300">Total Bookings</div>
+                      </div>
+                      <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                        <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                          {new Intl.NumberFormat('en-IN', {
+                            style: 'currency',
+                            currency: 'INR',
+                            minimumFractionDigits: 0,
+                          }).format(chartData.yearlySummary.totalRevenue)}
+                        </div>
+                        <div className="text-sm text-gray-600 dark:text-gray-300">Total Revenue</div>
+                      </div>
+                      <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                        <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                          {stats.confirmedBookings}
+                        </div>
+                        <div className="text-sm text-gray-600 dark:text-gray-300">Confirmed Bookings</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             </TabsContent>
 
             <TabsContent value="cars" className="space-y-6">
@@ -581,28 +823,25 @@ export default function AdminDashboard() {
                 <h2 className="text-2xl font-bold dark:text-white">Car Bookings & Messages</h2>
               </div>
 
-              {bookings.length === 0 ? (
-                <div className="text-center py-16">
-                  <MessageCircle className="h-16 w-16 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-gray-600 dark:text-gray-300 mb-2">No active bookings or messages</h3>
-                  <p className="text-gray-500 dark:text-gray-400 mb-6">When customers book your cars or send messages, they'll appear here.</p>
-                </div>
-              ) : (
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                      <thead className="bg-gray-50 dark:bg-gray-700">
-                        <tr>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Car</th>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Customer</th>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Contact</th>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Created Date</th>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                        {bookings.map((booking) => (
+              {/* Show bookings */}
+              {bookings.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold dark:text-white mb-4">Recent Bookings</h3>
+                  <div className="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <thead className="bg-gray-50 dark:bg-gray-700">
+                          <tr>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Car</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Customer</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Contact</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Created Date</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                          {bookings.map((booking) => (
                           <tr key={booking.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm font-medium text-gray-900 dark:text-white">
@@ -690,6 +929,134 @@ export default function AdminDashboard() {
                       </tbody>
                     </table>
                   </div>
+                </div>
+                </div>
+              )}
+
+              {/* Show chat messages */}
+              {chatMessages.length > 0 && (
+                <div className="mt-8">
+                  <h3 className="text-lg font-semibold dark:text-white mb-4">Recent Messages</h3>
+                  <div className="space-y-4">
+                    {chatMessages.map((chat) => (
+                      <div key={chat.id} className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border border-gray-200 dark:border-gray-700">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center">
+                              <h4 className="font-medium text-gray-900 dark:text-white truncate">
+                                {chat.car?.title || 'Unknown Car'}
+                                <span className="text-sm text-gray-500 ml-2">•</span>
+                                <span className="text-sm text-gray-500 ml-2">
+                                  {chat.user?.username || 'Unknown User'}
+                                </span>
+                              </h4>
+                              {chat.messageCount > 0 && (
+                                <span className="ml-2 text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-0.5 rounded-full">
+                                  {chat.messageCount} {chat.messageCount === 1 ? 'message' : 'messages'}
+                                </span>
+                              )}
+                            </div>
+                            <div className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                              {chat.lastMessage?.message ? (
+                                <span>
+                                  <span className="font-medium">Message:</span> {chat.lastMessage.message.substring(0, 50)}
+                                  {chat.lastMessage.message.length > 50 ? '...' : ''}
+                                </span>
+                              ) : (
+                                <span>No messages yet</span>
+                              )}
+                            </div>
+                            <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                              {chat.updatedAt ? new Date(chat.updatedAt).toLocaleString() : 'Unknown time'}
+                            </div>
+                          </div>
+                          <div className="flex flex-col space-y-2">
+                            <Link href={`/admin/chats/${chat.id}`}>
+                              <Button variant="outline" size="sm">
+                                <MessageCircle className="h-4 w-4 mr-2" />
+                                View Chat
+                              </Button>
+                            </Link>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Show message when no bookings or chat messages */}
+              {bookings.length === 0 && chatMessages.length === 0 && (
+                <div className="text-center py-16">
+                  <MessageCircle className="h-16 w-16 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-gray-600 dark:text-gray-300 mb-2">No active bookings or messages</h3>
+                  <p className="text-gray-500 dark:text-gray-400 mb-6">When customers book your cars or send messages, they'll appear here.</p>
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="notifications" className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold dark:text-white">Notifications</h2>
+                {notifications.length > 0 && (
+                  <Button
+                    variant="outline"
+                    onClick={markAllAsRead}
+                    disabled={unreadCount === 0}
+                  >
+                    Mark All as Read
+                  </Button>
+                )}
+              </div>
+
+              {notifications.length === 0 ? (
+                <div className="text-center py-16">
+                  <Bell className="h-16 w-16 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-gray-600 dark:text-gray-300 mb-2">No notifications yet</h3>
+                  <p className="text-gray-500 dark:text-gray-400">
+                    When users book your cars or contact you, notifications will appear here.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {notifications.map((notification) => (
+                    <div
+                      key={notification.id}
+                      className={`p-4 rounded-lg border ${
+                        !notification.read
+                          ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+                          : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+                      }`}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-medium text-gray-900 dark:text-white">
+                            {notification.type}
+                          </h4>
+                          <p className="text-gray-600 dark:text-gray-300 mt-1">
+                            {notification.message}
+                          </p>
+                          {notification.type && (
+                            <Link
+                              href={`/admin/bookings`}
+                              className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 mt-2 inline-block"
+                              onClick={() => markAsRead(notification.id)}
+                            >
+                              View details →
+                            </Link>
+                          )}
+                        </div>
+                        <div className="flex flex-col items-end ml-4">
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            {new Date(notification.timestamp).toLocaleString()}
+                          </span>
+                          {!notification.read && (
+                            <span className="mt-1 h-2 w-2 rounded-full bg-blue-500"></span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </TabsContent>

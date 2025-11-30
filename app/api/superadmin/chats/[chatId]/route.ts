@@ -17,10 +17,10 @@ export async function GET(request: Request, { params }: { params: { chatId: stri
       );
     }
 
-    const roomId = params.chatId; // In Supabase, this might be the room ID
+    const roomid = params.chatId; // In Supabase, this might be the room ID
 
     // Find all messages for the room
-    const chatMessages = await chatServices.getChatsByRoom(roomId);
+    const chatMessages = await chatServices.getChatsByRoom(roomid);
 
     if (!chatMessages || chatMessages.length === 0) {
       return NextResponse.json(
@@ -31,7 +31,7 @@ export async function GET(request: Request, { params }: { params: { chatId: stri
 
     // Group messages by room and format response
     const formattedChat = {
-      roomid: roomId,
+      roomid: roomid,
       messages: chatMessages.map((msg) => ({
         id: msg.id,
         message: msg.message,
@@ -65,7 +65,7 @@ export async function POST(request: Request, { params }: { params: { chatId: str
       );
     }
 
-    const roomId = params.chatId; // In Supabase, this might be the room ID
+    const roomid = params.chatId; // In Supabase, this might be the room ID
     const { message } = await request.json();
 
     if (!message) {
@@ -77,7 +77,7 @@ export async function POST(request: Request, { params }: { params: { chatId: str
 
     // Create a new message in Supabase
     const newMessage = await chatServices.createChat({
-      roomid: roomId,
+      roomid: roomid,
       senderid: decoded.userId,
       message: message,
       timestamp: new Date().toISOString(),

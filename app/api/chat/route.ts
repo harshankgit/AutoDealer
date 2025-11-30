@@ -49,7 +49,7 @@ export async function POST(request: Request) {
 
     // Determine the room for this conversation based on car and participants
     // We can use the car's roomid as the basis for the chat room
-    const roomId = car.roomid;
+    const roomid = car.roomid;
 
     // Ensure that the sender is either the car's admin, a user interested in the car, or a superadmin
     if (senderType !== 'superadmin') {
@@ -90,7 +90,7 @@ export async function POST(request: Request) {
 
     // Create a new chat message in Supabase
     const newMessage = await chatServices.createChat({
-      roomid: roomId,
+      roomid: roomid,
       senderid: senderId,
       message: message || '',
       timestamp: new Date().toISOString(),
@@ -186,6 +186,7 @@ export async function POST(request: Request) {
       const receiverUser = await userServices.getUserById(receiverId);
       const senderUser = await userServices.getUserById(senderId);
       const carDetails = await carServices.getCarById(carId);
+      const roomDetails = await roomServices.getRoomById(carDetails?.roomid || '');
 
       if (receiverUser) {
         // Send real-time notification to the receiver
@@ -194,14 +195,42 @@ export async function POST(request: Request) {
           message: message || 'File shared',
           senderId,
           senderName: senderUser?.username || 'Unknown User',
+          senderRole: senderType || 'user',
           carId,
           carTitle: carDetails?.title || 'Unknown Car',
-          timestamp: new Date(),
+          roomName: roomDetails?.name || 'Unknown Room',
+          timestamp: new Date().toISOString(),
         });
 
         // Also update the unread count for the receiver
         await pusher.trigger(`notification-${receiverId}`, 'notification-unread-count', {
           count: 1, // In a real implementation, this would be the actual unread count
+        });
+      }
+
+      // If the receiver is an admin/superadmin, also notify them via their notification channel
+      if (receiverUser && (receiverUser.role === 'admin' || receiverUser.role === 'superadmin')) {
+        await pusher.trigger(`notification-${receiverId}`, 'new-notification', {
+          type: 'chat',
+          message: `New message from ${senderUser?.username || 'a user'} about ${carDetails?.title || 'a car'}`,
+          senderId,
+          senderName: senderUser?.username || 'Unknown User',
+          carTitle: carDetails?.title || 'Unknown Car',
+          roomName: roomDetails?.name || 'Unknown Room',
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      // If sender is a regular user sending to an admin, also notify admin channels if needed
+      if (senderType === 'user' && receiverUser?.role === 'admin') {
+        // Notify admin about user interaction
+        await pusher.trigger(`notification-${receiverId}`, 'new-user-interaction', {
+          type: 'user_interaction',
+          message: `New message from ${senderUser?.username} regarding ${carDetails?.title}`,
+          userId: senderId,
+          userName: senderUser?.username || 'Unknown User',
+          carTitle: carDetails?.title || 'Unknown Car',
+          timestamp: new Date().toISOString(),
         });
       }
     } catch (notificationError) {
@@ -246,7 +275,7 @@ export async function GET(request: Request) {
     // Get all messages for the room using our chat service
     const chatMessages = await chatServices.getChatsByRoom(car.roomid);
 
-    // Group messages by conversation context
+    // Create a chat object with all messages for this room (which contains this car)
     const chat = {
       id: car.roomid,
       carid: carId,
@@ -259,10 +288,8 @@ export async function GET(request: Request) {
       }))
     };
 
-    if (!chat || chat.messages.length === 0) {
-      return NextResponse.json({ chat: null }, { status: 200 });
-    }
-
+    // Return the chat object whether or not there are messages
+    // This ensures the frontend has the structure to work with
     return NextResponse.json({ chat }, { status: 200 });
   } catch (error) {
     console.error('Fetch chat error:', error);

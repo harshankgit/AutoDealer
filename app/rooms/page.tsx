@@ -82,14 +82,14 @@ export default function RoomsPage() {
     }
   };
 
-  const handleDeleteRoom = async (roomId: string) => {
+  const handleDeleteRoom = async (roomid: string) => {
     if (!user || (user.role !== 'admin' && user.role !== 'superadmin')) {
       setError('Only admins can delete showrooms.');
       return;
     }
 
     try {
-      const response = await fetch(`/api/rooms/${roomId}`, {
+      const response = await fetch(`/api/rooms/${roomid}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -98,8 +98,8 @@ export default function RoomsPage() {
       });
 
       if (response.ok) {
-        setRooms(rooms.filter(room => room.id !== roomId));
-        setFilteredRooms(filteredRooms.filter(room => room.id !== roomId));
+        setRooms(rooms.filter(room => room.id !== roomid));
+        setFilteredRooms(filteredRooms.filter(room => room.id !== roomid));
         setError('Showroom deleted successfully.');
       } else {
         const errorData = await response.json();

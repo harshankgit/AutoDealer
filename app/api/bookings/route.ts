@@ -82,6 +82,26 @@ export async function POST(req: Request) {
       }
     }
 
+    // Create a database notification for the admin who owns the car (if admin exists)
+    if (adminUser) {
+      try {
+        const { notificationServices } = await import('@/lib/supabase/services/generalServices');
+        await notificationServices.createNotification({
+          recipientid: adminUser.id,
+          type: 'booking',
+          title: 'New Car Booking',
+          message: `New booking for ${car.title} by ${user.username}`,
+          senderid: user.id,
+          related_entity_id: booking.id, // Link to the booking
+          read: false,  // Default value
+          updated_at: new Date().toISOString(),  // Current timestamp
+        });
+      } catch (error) {
+        console.error('Database notification creation error:', error);
+        // Don't fail the booking if database notification creation fails
+      }
+    }
+
     // Send email notification to the admin who owns the car (if admin exists)
     // Only send if email credentials are configured and admin user exists
     if (process.env.EMAIL_USER && process.env.EMAIL_PASS && adminUser) {

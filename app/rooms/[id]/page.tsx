@@ -70,7 +70,7 @@ interface Room {
 export default function RoomDetailsPage() {
   const params = useParams();
   const router = useRouter();
-  const roomId = params?.id && Array.isArray(params.id) ? params.id[0] : params?.id || '';
+  const roomid = params?.id && Array.isArray(params.id) ? params.id[0] : params?.id || '';
 
   const [room, setRoom] = useState<Room | null>(null);
   const [cars, setCars] = useState<Car[]>([]);
@@ -122,7 +122,7 @@ export default function RoomDetailsPage() {
 
   // Fetch room and cars data when user is loaded
   useEffect(() => {
-    if (!roomId) return; // wait until route param is available
+    if (!roomid) return; // wait until route param is available
     if (loading) return; // Wait until user is loaded
 
     if (!user) {
@@ -143,7 +143,7 @@ export default function RoomDetailsPage() {
     };
 
     fetchData();
-  }, [roomId, user, loading]); // Use loading from context
+  }, [roomid, user, loading]); // Use loading from context
 
   useEffect(() => {
     applyFilters();
@@ -156,12 +156,12 @@ export default function RoomDetailsPage() {
 
     // Fetch room details and cars in parallel
     const [roomResponse, carsResponse] = await Promise.all([
-      fetch(`/api/rooms/${roomId}`, {
+      fetch(`/api/rooms/${roomid}`, {
         headers: {
           'Authorization': `Bearer ${user.token}`,
         },
       }),
-      fetch(`/api/cars?roomId=${roomId}`, {
+      fetch(`/api/cars?roomid=${roomid}`, {
         headers: {
           'Authorization': `Bearer ${user.token}`,
         },

@@ -286,12 +286,12 @@ export default function EditCarPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-5xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Edit Car</h1>
-            <p className="mt-1 text-sm text-gray-500">Update the details of this car listing</p>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Edit Car</h1>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Update the details of this car listing</p>
           </div>
           <Button variant="outline" asChild>
             <Link href="/admin">
@@ -301,13 +301,13 @@ export default function EditCarPage() {
         </div>
 
         {error && (
-          <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-6">
+          <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-400 dark:border-red-600 p-4 mb-6">
             <div className="flex">
               <div className="flex-shrink-0">
-                <X className="h-5 w-5 text-red-400" />
+                <X className="h-5 w-5 text-red-400 dark:text-red-500" />
               </div>
               <div className="ml-3">
-                <p className="text-sm text-red-700">{error}</p>
+                <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
               </div>
             </div>
           </div>
@@ -476,7 +476,7 @@ export default function EditCarPage() {
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="ownershipHistory">Ownership History</Label>
+                  <Label htmlFor="ownershipHistory" className="dark:text-gray-300">Ownership History</Label>
                   <Textarea
                     id="ownershipHistory"
                     name="ownershipHistory"
@@ -486,9 +486,9 @@ export default function EditCarPage() {
                     rows={3}
                   />
                 </div>
-                
+
                 <div className="space-y-2">
-                  <Label htmlFor="description">Description *</Label>
+                  <Label htmlFor="description" className="dark:text-gray-300">Description *</Label>
                   <Textarea
                     id="description"
                     name="description"
@@ -512,7 +512,7 @@ export default function EditCarPage() {
                 <div className="space-y-4">
                   <div
                     className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                      dragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
+                      dragActive ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-500' : 'border-gray-300 hover:border-gray-400 dark:border-gray-600 dark:hover:border-gray-500'
                     }`}
                     onDragEnter={handleDrag}
                     onDragOver={handleDrag}
@@ -520,13 +520,13 @@ export default function EditCarPage() {
                     onDrop={handleDrop}
                   >
                     <div className="space-y-2">
-                      <div className="mx-auto h-12 w-12 text-gray-400">
+                      <div className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500">
                         <Upload className="h-full w-full" />
                       </div>
-                      <div className="flex text-sm text-gray-600">
+                      <div className="flex text-sm text-gray-600 dark:text-gray-400">
                         <label
                           htmlFor="file-upload"
-                          className="relative cursor-pointer rounded-md bg-white font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none"
+                          className="relative cursor-pointer rounded-md bg-white dark:bg-gray-800 font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 focus-within:outline-none"
                         >
                           <span>Upload files</span>
                           <input
@@ -541,20 +541,20 @@ export default function EditCarPage() {
                         </label>
                         <p className="pl-1">or drag and drop</p>
                       </div>
-                      <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">PNG, JPG, GIF up to 10MB</p>
                     </div>
                   </div>
 
                   {isUploading && (
                     <div className="flex items-center justify-center py-4">
-                      <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
-                      <span className="ml-2 text-sm text-gray-500">Uploading images...</span>
+                      <Loader2 className="h-6 w-6 animate-spin text-blue-500 dark:text-blue-400" />
+                      <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">Uploading images...</span>
                     </div>
                   )}
 
                   {formData.images.length > 0 && (
                     <div className="mt-4">
-                      <h3 className="text-sm font-medium text-gray-700 mb-2">Uploaded Images</h3>
+                      <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Uploaded Images</h3>
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
                         {formData.images.map((image, index) => (
                           <div key={index} className="relative group">

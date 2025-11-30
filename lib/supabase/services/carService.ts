@@ -48,7 +48,7 @@ export const carServices = {
             description: carData.description,
             specifications: carData.specifications || {},
             condition: carData.condition,
-            availability: carData.availability,
+            availability: carData.availability || 'Available', // Set default if not provided
             roomid: carData.roomid,
             adminid: carData.adminid
           }
@@ -79,6 +79,7 @@ export const carServices = {
     brand?: string;
     minPrice?: number;
     maxPrice?: number;
+    roomid?: string;
   }): Promise<Car[]> {
     try {
       console.log('Fetching cars with filters:', filters);
@@ -97,6 +98,9 @@ export const carServices = {
         }
         if (filters.maxPrice !== undefined) {
           query = query.lte('price', filters.maxPrice);
+        }
+        if (filters.roomid) {
+          query = query.eq('roomid', filters.roomid);
         }
       }
 

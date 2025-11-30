@@ -1,3 +1,4 @@
+import { createClient } from '@supabase/supabase-js';
 import { supabase } from '../client';
 import { getSupabaseServiceRole } from '../server';
 
@@ -79,13 +80,39 @@ export const bookingServices = {
     }
   },
 
-  // Get bookings by user ID
-  async getBookingsByUser(userId: string): Promise<Booking[]> {
+  // Get bookings by user ID - Uses RLS so requires client scoped with user JWT
+  async getBookingsByUser(userId: string, userToken?: string): Promise<Booking[]> {
     try {
-      const { data, error } = await supabase
+      let supabaseClient;
+      if (userToken) {
+        // Create client scoped with user token for RLS enforcement
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+        const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+        supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+          global: {
+            headers: { Authorization: `Bearer ${userToken}` },
+          },
+        });
+      } else {
+        // Use regular client but explicitly filter by user ID
+        supabaseClient = supabase;
+      }
+
+      // Get bookings with associated car data
+      const { data: bookingsData, error } = await supabaseClient
         .from('bookings')
-        .select('*, car:cars(title, brand, model)')
-        .eq('userid', userId)
+        .select(`
+          *,
+          cars!inner (
+            title,
+            brand,
+            model,
+            roomid,
+            images
+          )
+        `)
+        .eq('userid', userId) // Explicitly filter by user ID when not using token-scoped client
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -93,7 +120,45 @@ export const bookingServices = {
         return [];
       }
 
-      return data as Booking[];
+      // Extract all unique car room IDs to fetch rooms in a single query
+      const uniqueRoomIds = Array.from(new Set(bookingsData
+        .map(b => b.cars?.roomid)
+        .filter(roomid => roomid)
+      )) as string[];
+
+      let roomsMap: Record<string, any> = {};
+      if (uniqueRoomIds.length > 0) {
+        // Use service role for fetching rooms since they're not directly tied to user auth
+        const { data: roomsData, error: roomsError } = await getSupabaseServiceRole()
+          .from('rooms')
+          .select('id, name, location')
+          .in('id', uniqueRoomIds);
+
+        if (!roomsError && roomsData) {
+          roomsMap = roomsData.reduce((acc, room) => {
+            acc[room.id] = room;
+            return acc;
+          }, {} as Record<string, any>);
+        }
+      }
+
+      // Add room information to bookings
+      const bookingsWithRoom = bookingsData.map(booking => {
+        if (booking.cars?.roomid && roomsMap[booking.cars.roomid]) {
+          return {
+            ...booking,
+            // Add the roomid at the top level to match UI expectations
+            roomid: booking.cars.roomid,
+            roomId: roomsMap[booking.cars.roomid] // For name/location access
+          };
+        }
+        return {
+          ...booking,
+          roomid: booking.cars?.roomid || null
+        };
+      });
+
+      return bookingsWithRoom as Booking[];
     } catch (error) {
       console.error('Error in getBookingsByUser:', error);
       return [];
@@ -122,12 +187,31 @@ export const bookingServices = {
   },
 
   // Get bookings by room ID
-  async getBookingsByRoom(roomId: string): Promise<Booking[]> {
+  async getBookingsByRoom(roomid: string): Promise<Booking[]> {
     try {
+      // First get all cars in the room
+      const { data: carsData, error: carsError } = await supabase
+        .from('cars')
+        .select('id')
+        .eq('roomid', roomid);
+
+      if (carsError) {
+        console.error('Error getting cars by room:', carsError);
+        return [];
+      }
+
+      if (!carsData || carsData.length === 0) {
+        return [];
+      }
+
+      // Extract car IDs
+      const carIds = carsData.map(car => car.id);
+
+      // Then get bookings for those cars
       const { data, error } = await supabase
         .from('bookings')
-        .select('*, car:cars(title, brand, model), user:users(username, email)')
-        .eq('roomid', roomId)
+        .select('*, car:cars(title, brand, model, roomid), user:users(username, email)')
+        .in('carid', carIds)
         .order('created_at', { ascending: false });
 
       if (error) {

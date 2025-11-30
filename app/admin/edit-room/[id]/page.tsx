@@ -28,7 +28,7 @@ export default function EditRoomPage() {
   const router = useRouter();
   const params = useParams();
   const p = params ?? {};
-  const roomId = typeof (p as any).id === 'string' ? (p as any).id : Array.isArray((p as any).id) ? (p as any).id[0] : undefined;
+  const roomid = typeof (p as any).id === 'string' ? (p as any).id : Array.isArray((p as any).id) ? (p as any).id[0] : undefined;
   const { user, loading } = useUser(); // Use context instead of local state
 
   useEffect(() => {
@@ -42,11 +42,11 @@ export default function EditRoomPage() {
       return;
     }
 
-    if (user && roomId) {
+    if (user && roomid) {
       // Fetch room data
       const fetchRoom = async () => {
         try {
-          const response = await fetch(`/api/rooms/${roomId}`, {
+          const response = await fetch(`/api/rooms/${roomid}`, {
             headers: {
               'Authorization': `Bearer ${user?.token}`, // Use context user token
             },
@@ -83,7 +83,7 @@ export default function EditRoomPage() {
 
       fetchRoom();
     }
-  }, [user, loading, roomId, router]);
+  }, [user, loading, roomid, router]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -113,8 +113,8 @@ export default function EditRoomPage() {
     try {
       // Use superadmin API if user is superadmin, otherwise use regular API
       const endpoint = user?.role === 'superadmin' 
-        ? `/api/superadmin/rooms/${roomId}` 
-        : `/api/rooms/${roomId}`;
+        ? `/api/superadmin/rooms/${roomid}` 
+        : `/api/rooms/${roomid}`;
 
       const response = await fetch(endpoint, {
         method: 'PUT',
