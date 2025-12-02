@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { fileServices } from '@/lib/supabase/services/generalServices';
 import { verifyToken } from '@/lib/auth';
+import { getSupabaseServiceRole } from '@/lib/supabase/server';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB for car images
 
@@ -32,6 +33,8 @@ export async function POST(request: Request) {
       );
     }
 
+    const supabase = getSupabaseServiceRole();
+    const uploadedFileUrls = [];
     const uploadedFileIds = [];
 
     for (const file of files) {
@@ -55,24 +58,73 @@ export async function POST(request: Request) {
       const timestamp = Date.now();
       const randomString = Math.random().toString(36).substring(2, 8);
       const fileName = `${timestamp}_${randomString}_${file.name}`;
+      const folderName = 'car-images';
 
-      // Save file to database using Supabase service
-      const fileDoc = await fileServices.createFile({
-        name: fileName,
-        path: fileName, // This could be a path in Supabase Storage
-        size: file.size,
-        type: file.type,
-        uploaded_by: decodedToken.userId,
-      });
+      // List of potential bucket names to try - check most common ones first
+      const potentialBuckets = ['public', 'car-images', 'avatars', 'images', 'storage', 'files'];
+      let uploadResult = null;
+      let bucketName = '';
 
-      if (fileDoc) {
-        uploadedFileIds.push(fileDoc.id);
+      // Try each bucket until one works
+      for (const bucket of potentialBuckets) {
+        uploadResult = await supabase
+          .storage
+          .from(bucket)
+          .upload(`${folderName}/${fileName}`, file, {
+            cacheControl: '3600',
+            upsert: false
+          });
+
+        if (!uploadResult.error) {
+          bucketName = bucket;
+          break; // Successfully uploaded, exit the loop
+        } else if (uploadResult.error.message.includes('Bucket not found')) {
+          // Try the next bucket
+          continue;
+        } else {
+          // Some other error, don't continue to try other buckets
+          break;
+        }
+      }
+
+      if (!uploadResult || uploadResult.error) {
+        // If all buckets failed, return the last error
+        const error = uploadResult?.error || { message: 'No available buckets found' };
+        console.error('Supabase storage upload error:', error);
+        return NextResponse.json(
+          { error: `Failed to upload file: ${error.message}` },
+          { status: 500 }
+        );
+      }
+
+      // Get public URL for the uploaded file
+      const { data: publicUrlData } = supabase
+        .storage
+        .from(bucketName)
+        .getPublicUrl(`${folderName}/${fileName}`);
+
+      if (publicUrlData?.publicUrl) {
+        // Save file metadata to database using Supabase service
+        // Store the full path including bucket name for retrieval
+        const fileDoc = await fileServices.createFile({
+          name: fileName,
+          path: `${bucketName}/${folderName}/${fileName}`, // Store full path in the DB
+          size: file.size,
+          type: file.type,
+          uploaded_by: decodedToken.userId,
+        });
+
+        if (fileDoc) {
+          uploadedFileIds.push(fileDoc.id);
+          uploadedFileUrls.push(publicUrlData.publicUrl);
+        }
       }
     }
 
     return NextResponse.json({
       message: 'Car images uploaded successfully',
       fileIds: uploadedFileIds,
+      fileUrls: uploadedFileUrls,
     });
   } catch (error: any) {
     console.error('Car image upload error:', error);

@@ -33,16 +33,92 @@ export async function GET(request: Request) {
 
     const totalShowrooms = allShowrooms.length;
 
-    // Get monthly visits data for charts (last 12 months)
-    const monthlyVisits = await visitServices.getMonthlyVisitsData();
+    // Get monthly visits data for charts (last 12 months) - use original method first
+    let monthlyVisits = await visitServices.getMonthlyVisitsData();
+
+    // If the original method returns empty, try the new aggregated API as fallback
+    if (!monthlyVisits || monthlyVisits.length === 0) {
+      console.log('Original monthly visits data is empty, trying aggregated method');
+      try {
+        const monthlyVisitsRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/homepage/monthly-visits-aggregated`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          cache: 'no-store',
+        });
+
+        if (monthlyVisitsRes.ok) {
+          monthlyVisits = await monthlyVisitsRes.json();
+        } else {
+          console.log('Aggregated visits API failed, using empty array');
+        }
+      } catch (error) {
+        console.error('Error fetching monthly visits aggregated data:', error);
+      }
+    }
 
     // Get user growth data (last 12 months)
-    const allUsers = await userServices.getAllUsers();
-    const userGrowthData: any[] = []; // Placeholder - implement actual user growth data calculation if needed
+    let userGrowthData = [];
+    try {
+      const userGrowthRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/homepage/user-growth`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        // Disable caching to ensure fresh data
+        cache: 'no-store',
+      });
 
-    // Get car distribution data by brand/type
-    const allCars = await carServices.getAllCars();
-    const carDistributionData: any[] = []; // Placeholder - implement actual car distribution data calculation if needed
+      if (userGrowthRes.ok) {
+        userGrowthData = await userGrowthRes.json();
+      }
+    } catch (error) {
+      console.error('Error fetching user growth data:', error);
+      // Fallback to empty array if API call fails
+      userGrowthData = [];
+    }
+
+    // Get car distribution data by brand
+    let carDistributionData = [];
+    try {
+      const carDistributionRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/homepage/car-distribution`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        // Disable caching to ensure fresh data
+        cache: 'no-store',
+      });
+
+      if (carDistributionRes.ok) {
+        carDistributionData = await carDistributionRes.json();
+      }
+    } catch (error) {
+      console.error('Error fetching car distribution data:', error);
+      // Fallback to empty array if API call fails
+      carDistributionData = [];
+    }
+
+    // Get performance metrics data
+    let performanceMetrics = null;
+    try {
+      const performanceMetricsRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/homepage/performance-metrics`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        // Disable caching to ensure fresh data
+        cache: 'no-store',
+      });
+
+      if (performanceMetricsRes.ok) {
+        performanceMetrics = await performanceMetricsRes.json();
+      }
+    } catch (error) {
+      console.error('Error fetching performance metrics:', error);
+      // Don't fail the request if performance metrics fail
+    }
 
     return NextResponse.json({
       totalUsers: totalUsers || 0,
@@ -50,8 +126,9 @@ export async function GET(request: Request) {
       totalCars: totalCars || 0,
       totalVisits: totalVisits || 0,
       monthlyVisits: monthlyVisits || [],
-      userGrowthData: userGrowthData || [],
-      carDistributionData: carDistributionData || []
+      userGrowthData,
+      carDistributionData,
+      performanceMetrics
     });
   } catch (error) {
     console.error('Error in homepage stats API:', error);

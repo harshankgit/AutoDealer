@@ -126,8 +126,8 @@ export default function AddCarPage() {
         throw new Error(result.error || 'Failed to upload files');
       }
 
-      // Convert file IDs to URLs that can access the images
-      const newImageUrls = result.fileIds.map((id: string) => `/api/files/${id}`);
+      // Use the image URLs returned from the upload API
+      const newImageUrls = result.fileUrls || result.fileIds.map((id: string) => `/api/files/${id}`);
 
       // Add new images to the existing ones
       setFormData(prev => ({
@@ -137,7 +137,11 @@ export default function AddCarPage() {
 
     } catch (err: any) {
       console.error('Error uploading files:', err);
-      setError(err.message || 'Failed to upload files. Please try again.');
+      if (err.message && err.message.includes('Bucket not found')) {
+        setError('File upload is not configured properly. Please add image URLs manually below.');
+      } else {
+        setError(err.message || 'Failed to upload files. Please try again.');
+      }
     } finally {
       setIsUploading(false);
     }
@@ -553,56 +557,48 @@ export default function AddCarPage() {
                   </div>
                 )}
                 
-                {/* Fallback URL input */}
-                <div className="mt-4 space-y-2">
-                  <Label htmlFor="imageUrls">Or add image URLs (comma-separated)</Label>
-                  <Input
-                    id="imageUrls"
-                    type="text"
-                    placeholder="https://example.com/image1.jpg, https://example.com/image2.png"
-                    value={formData.images.join(', ')}
-                    onChange={(e) => {
-                      const urls = e.target.value.split(',').map(url => url.trim()).filter(url => url !== '');
-                      setFormData(prev => ({ ...prev, images: urls }));
-                    }}
-                    className="h-11"
-                  />
-                </div>
-
-                {/* Existing dynamic image fields will be removed as we are replacing with comma-separated input for simplicity */}
-                {/* {formData.images.map((image, index) => (
-                  <div key={index} className="flex gap-2">
+                {/* Individual image URL inputs */}
+                {formData.images.map((url, index) => (
+                  <div key={`url-${index}`} className="flex gap-2">
                     <Input
                       type="url"
                       placeholder="https://example.com/car-image.jpg"
-                      value={image}
-                      onChange={(e) => handleImageChange(index, e.target.value)}
+                      value={url}
+                      onChange={(e) => {
+                        const newImages = [...formData.images];
+                        newImages[index] = e.target.value;
+                        setFormData(prev => ({ ...prev, images: newImages }));
+                      }}
                       className="h-11"
-                      required={index === 0}
                     />
-                    {formData.images.length > 1 && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        onClick={() => removeImageField(index)}
-                        className="h-11 w-11"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    )}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => {
+                        const newImages = formData.images.filter((_, i) => i !== index);
+                        setFormData(prev => ({ ...prev, images: newImages }));
+                      }}
+                      className="h-11 w-11"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
                   </div>
                 ))}
-                
+
+                {/* Add more image fields button */}
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={addImageField}
+                  onClick={() => setFormData(prev => ({
+                    ...prev,
+                    images: [...prev.images, '']
+                  }))}
                   className="w-full"
                 >
                   <Plus className="h-4 w-4 mr-2" />
-                  Add Another Image
-                </Button> */}
+                  Add Another Image URL
+                </Button>
               </div>
 
               <Separator />

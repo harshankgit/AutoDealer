@@ -11,6 +11,7 @@ import { motion } from 'framer-motion';
 import MonthlyVisitorsChart from '@/components/charts/MonthlyVisitorsChart';
 import LineChart from '@/components/charts/LineChart';
 import PieChart from '@/components/charts/PieChart';
+import dynamic from 'next/dynamic';
 
 interface HomePageStats {
   totalUsers: number;
@@ -20,7 +21,20 @@ interface HomePageStats {
   monthlyVisits: { month: string; count: number }[];
   userGrowthData: { month: string; count: number }[];
   carDistributionData: { brand: string; count: number }[];
+  performanceMetrics?: {
+    avgVisitDuration: string;
+    bounceRate: string;
+    conversionRate: string;
+    pageViews: number;
+    topPerformingPages: { path: string; percentage: string }[];
+  };
 }
+
+// Dynamically import the FirstVisitAnimation component to avoid SSR issues
+const FirstVisitAnimation = dynamic(() => import('@/components/animations/FirstVisitAnimation'), {
+  ssr: false,
+  loading: () => <div className="min-h-screen bg-background" />
+});
 
 export default function Home() {
   const [user, setUser] = useState<any>(null);
@@ -31,7 +45,18 @@ export default function Home() {
     totalVisits: 0,
     monthlyVisits: [],
     userGrowthData: [],
-    carDistributionData: []
+    carDistributionData: [],
+    performanceMetrics: {
+      avgVisitDuration: '3m 45s',
+      bounceRate: '32.4%',
+      conversionRate: '4.7%',
+      pageViews: 24800,
+      topPerformingPages: [
+        { path: '/cars', percentage: '32.4%' },
+        { path: '/rooms', percentage: '24.1%' },
+        { path: '/dashboard', percentage: '18.7%' }
+      ]
+    }
   });
   const [statsLoading, setStatsLoading] = useState(true);
   const [chartsLoading, setChartsLoading] = useState(true);
@@ -42,8 +67,8 @@ export default function Home() {
     const userData = localStorage.getItem('user');
     if (userData) setUser(JSON.parse(userData));
 
-    // Fetch basic platform stats
-    fetch('/api/stats')
+    // Fetch basic platform stats with no-cache
+    fetch('/api/stats', { cache: 'no-store' })
       .then((res) => res.json())
       .then((data) => {
         if (!data.error) {
@@ -58,8 +83,8 @@ export default function Home() {
         console.error('Error fetching basic stats:', error);
       });
 
-    // Fetch visits data
-    fetch('/api/visits', { method: 'POST' })
+    // Fetch visits data with no-cache
+    fetch('/api/visits', { method: 'POST', cache: 'no-store' })
       .then((res) => res.json())
       .then((data) => {
         if (!data.error && typeof data.count === 'number') {
@@ -78,8 +103,8 @@ export default function Home() {
         setVisits(prev => prev);
       });
 
-    // Fetch detailed stats for charts
-    fetch('/api/homepage/stats')
+    // Fetch detailed stats for charts with no-cache
+    fetch('/api/homepage/stats', { cache: 'no-store' })
       .then((res) => res.json())
       .then((data) => {
         if (!data.error) {
@@ -91,7 +116,8 @@ export default function Home() {
             totalVisits: data.totalVisits || prev.totalVisits,
             monthlyVisits: data.monthlyVisits || prev.monthlyVisits,
             userGrowthData: data.userGrowthData || prev.userGrowthData,
-            carDistributionData: data.carDistributionData || prev.carDistributionData
+            carDistributionData: data.carDistributionData || prev.carDistributionData,
+            performanceMetrics: data.performanceMetrics || prev.performanceMetrics
           }));
         }
       })
@@ -104,7 +130,7 @@ export default function Home() {
       });
   }, []);
 
-  return (
+  const content = (
     <div className="min-h-screen bg-background">
       {/* Hero Section */}
       <div className="relative overflow-hidden">
@@ -133,7 +159,7 @@ export default function Home() {
             </div>
 
             {!chartsLoading && stats ? (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5 }}
@@ -149,7 +175,7 @@ export default function Home() {
                     <div className="text-xs text-muted-foreground mt-1">Showrooms</div>
                   </div>
                   <div className="text-center p-4 bg-white dark:bg-gray-800 rounded-lg shadow">
-                    <AnimatedCounter value={stats.totalVisits || 0} duration={1400} className="text-3xl font-bold text-foreground" />
+                    <AnimatedCounter value={stats.totalVisits || 0} duration={1400} className="text-2xl font-bold text-foreground" />
                     <div className="text-xs text-muted-foreground mt-1">Total Visits</div>
                   </div>
                 </div>
@@ -205,10 +231,89 @@ export default function Home() {
           className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8"
         >
           <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">Platform Analytics</h2>
-            <p className="text-lg text-gray-600 dark:text-gray-400 max-w-3xl mx-auto">
-              Real-time insights and analytics about user activity, car inventory, and platform performance.
-            </p>
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-4">
+              <div>
+                <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white">Platform Analytics</h2>
+                <p className="text-lg text-gray-600 dark:text-gray-400 max-w-3xl">
+                  Real-time insights and analytics about user activity, car inventory, and platform performance.
+                </p>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => {
+                  setStatsLoading(true);
+                  setChartsLoading(true);
+                  // Refetch all stats with no-cache headers
+                  fetch('/api/stats', { cache: 'no-store' })
+                    .then((res) => res.json())
+                    .then((data) => {
+                      if (!data.error) {
+                        setStats(prev => ({
+                          ...prev,
+                          totalUsers: Number(data.totalUsers) || prev.totalUsers,
+                          totalShowrooms: Number(data.totalShowrooms) || prev.totalShowrooms
+                        }));
+                      }
+                    })
+                    .catch((error) => {
+                      console.error('Error fetching basic stats:', error);
+                    });
+
+                  // Fetch visits data
+                  fetch('/api/visits', { method: 'POST', cache: 'no-store' })
+                    .then((res) => res.json())
+                    .then((data) => {
+                      if (!data.error && typeof data.count === 'number') {
+                        setVisits(data.count);
+                        setStats(prev => ({
+                          ...prev,
+                          totalVisits: data.count
+                        }));
+                      } else {
+                        setVisits(prev => prev);
+                      }
+                    })
+                    .catch((error) => {
+                      console.error('Error fetching visits:', error);
+                      setVisits(prev => prev);
+                    });
+
+                  // Fetch detailed stats for charts with no-cache headers
+                  fetch('/api/homepage/stats', { cache: 'no-store' })
+                    .then((res) => res.json())
+                    .then((data) => {
+                      if (!data.error) {
+                        setStats(prev => ({
+                          ...prev,
+                          totalUsers: data.totalUsers || prev.totalUsers,
+                          totalShowrooms: data.totalShowrooms || prev.totalShowrooms,
+                          totalCars: data.totalCars || prev.totalCars,
+                          totalVisits: data.totalVisits || prev.totalVisits,
+                          monthlyVisits: data.monthlyVisits || prev.monthlyVisits,
+                          userGrowthData: data.userGrowthData || prev.userGrowthData,
+                          carDistributionData: data.carDistributionData || prev.carDistributionData,
+                          performanceMetrics: data.performanceMetrics || prev.performanceMetrics
+                        }));
+                      }
+                    })
+                    .catch((error) => {
+                      console.error('Error fetching homepage stats:', error);
+                    })
+                    .finally(() => {
+                      setChartsLoading(false);
+                      setStatsLoading(false);
+                    });
+                }}
+                disabled={statsLoading || chartsLoading}
+                className="flex items-center gap-2"
+              >
+                <svg className={`w-4 h-4 ${statsLoading || chartsLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+                Refresh Data
+              </Button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12">
@@ -229,7 +334,7 @@ export default function Home() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="flex-1 flex items-center justify-center">
-                  <div className="w-full h-64 sm:h-72">
+                  <div className="w-full h-64 sm:h-72 md:h-80">
                     <MonthlyVisitorsChart
                       data={{
                         labels: stats.monthlyVisits.map(item => item.month),
@@ -238,20 +343,33 @@ export default function Home() {
                             label: 'Visitors',
                             data: stats.monthlyVisits.map(item => item.count),
                             backgroundColor: [
-                              'rgba(59, 130, 246, 0.7)',
-                              'rgba(147, 51, 234, 0.7)',
-                              'rgba(2, 132, 199, 0.7)',
-                              'rgba(34, 197, 94, 0.7)',
-                              'rgba(245, 158, 11, 0.7)',
-                              'rgba(239, 68, 68, 0.7)',
-                              'rgba(168, 85, 247, 0.7)',
-                              'rgba(6, 182, 212, 0.7)',
-                              'rgba(234, 179, 8, 0.7)',
-                              'rgba(190, 24, 93, 0.7)',
-                              'rgba(107, 114, 142, 0.7)',
-                              'rgba(249, 115, 22, 0.7)',
+                              'rgba(59, 130, 246, 0.8)',    // Blue
+                              'rgba(147, 51, 234, 0.8)',    // Purple
+                              'rgba(2, 132, 199, 0.8)',     // Light Blue
+                              'rgba(34, 197, 94, 0.8)',     // Green
+                              'rgba(245, 158, 11, 0.8)',    // Yellow
+                              'rgba(239, 68, 68, 0.8)',     // Red
+                              'rgba(168, 85, 247, 0.8)',    // Indigo
+                              'rgba(6, 182, 212, 0.8)',     // Teal
+                              'rgba(234, 179, 8, 0.8)',     // Amber
+                              'rgba(190, 24, 93, 0.8)',     // Pink
+                              'rgba(107, 114, 142, 0.8)',   // Gray
+                              'rgba(249, 115, 22, 0.8)',    // Orange
                             ],
-                            borderColor: 'rgba(59, 130, 246, 1)', // Using single color for bar charts
+                            borderColor: [
+                              'rgba(59, 130, 246, 1)',      // Blue
+                              'rgba(147, 51, 234, 1)',      // Purple
+                              'rgba(2, 132, 199, 1)',       // Light Blue
+                              'rgba(34, 197, 94, 1)',       // Green
+                              'rgba(245, 158, 11, 1)',      // Yellow
+                              'rgba(239, 68, 68, 1)',       // Red
+                              'rgba(168, 85, 247, 1)',      // Indigo
+                              'rgba(6, 182, 212, 1)',       // Teal
+                              'rgba(234, 179, 8, 1)',       // Amber
+                              'rgba(190, 24, 93, 1)',       // Pink
+                              'rgba(107, 114, 142, 1)',     // Gray
+                              'rgba(249, 115, 22, 1)',      // Orange
+                            ],
                             borderWidth: 1,
                           }
                         ]
@@ -280,7 +398,7 @@ export default function Home() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="flex-1 flex items-center justify-center">
-                  <div className="w-full h-64 sm:h-72">
+                  <div className="w-full h-64 sm:h-72 md:h-80">
                     <LineChart
                       data={{
                         labels: stats.userGrowthData.map(item => item.month),
@@ -288,8 +406,8 @@ export default function Home() {
                           {
                             label: 'New Users',
                             data: stats.userGrowthData.map(item => item.count),
-                            borderColor: 'rgb(72, 187, 120)',
-                            backgroundColor: 'rgba(72, 187, 120, 0.1)',
+                            borderColor: 'rgb(59, 130, 246)',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
                             tension: 0.4,
                             fill: true,
                           }
@@ -321,7 +439,7 @@ export default function Home() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="flex-1 flex items-center justify-center">
-                  <div className="w-full h-64 sm:h-72">
+                  <div className="w-full h-64 sm:h-72 md:h-80">
                     <PieChart
                       data={{
                         labels: stats.carDistributionData.map(item => item.brand),
@@ -329,14 +447,14 @@ export default function Home() {
                           {
                             data: stats.carDistributionData.map(item => item.count),
                             backgroundColor: [
-                              'rgba(255, 99, 132, 0.8)',
-                              'rgba(54, 162, 235, 0.8)',
-                              'rgba(255, 206, 86, 0.8)',
-                              'rgba(75, 192, 192, 0.8)',
-                              'rgba(153, 102, 255, 0.8)',
-                              'rgba(255, 159, 64, 0.8)',
-                              'rgba(255, 107, 132, 0.8)',
-                              'rgba(106, 162, 255, 0.8)',
+                              'rgba(59, 130, 246, 0.8)',    // Blue
+                              'rgba(147, 51, 234, 0.8)',    // Purple
+                              'rgba(2, 132, 199, 0.8)',     // Light Blue
+                              'rgba(34, 197, 94, 0.8)',     // Green
+                              'rgba(245, 158, 11, 0.8)',    // Yellow
+                              'rgba(239, 68, 68, 0.8)',     // Red
+                              'rgba(168, 85, 247, 0.8)',    // Indigo
+                              'rgba(6, 182, 212, 0.8)',     // Teal
                             ],
                             borderWidth: 2,
                           }
@@ -366,7 +484,7 @@ export default function Home() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                       <p className="text-sm text-blue-600 dark:text-blue-400 mb-1">Avg. Visit Duration</p>
                       <p className="font-semibold text-gray-900 dark:text-white">3m 45s</p>
@@ -387,10 +505,10 @@ export default function Home() {
 
                   <div className="mt-6">
                     <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Top Performing Pages</h4>
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       <div>
                         <div className="flex justify-between text-sm mb-1">
-                          <span className="text-gray-600 dark:text-gray-400">/cars</span>
+                          <span className="text-gray-600 dark:text-gray-400 truncate">/cars</span>
                           <span className="font-medium text-gray-900 dark:text-white">32.4%</span>
                         </div>
                         <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
@@ -399,7 +517,7 @@ export default function Home() {
                       </div>
                       <div>
                         <div className="flex justify-between text-sm mb-1">
-                          <span className="text-gray-600 dark:text-gray-400">/rooms</span>
+                          <span className="text-gray-600 dark:text-gray-400 truncate">/rooms</span>
                           <span className="font-medium text-gray-900 dark:text-white">24.1%</span>
                         </div>
                         <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
@@ -408,8 +526,8 @@ export default function Home() {
                       </div>
                       <div>
                         <div className="flex justify-between text-sm mb-1">
-                          <span className="text-gray-600 dark:text-gray-400">/dashboard</span>
-                          <span className="font-medium text-gray-900 dark:text-white">18.7%</span>
+                          <span className="text-gray-600 dark:text-gray-400 truncate">/dashboard</span>
+                          <span className="font-semibold text-gray-900 dark:text-white">18.7%</span>
                         </div>
                         <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                           <div className="bg-purple-600 h-2 rounded-full" style={{ width: '18.7%' }}></div>
@@ -428,73 +546,79 @@ export default function Home() {
         </div>
       )}
 
-      {/* Features Section */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">Why Choose AutoDealer?</h2>
-          <p className="text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">Our unique room-based system provides a personalized car buying experience with direct dealer interaction.</p>
+      {/* Recent Activity Section */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="text-center mb-8">
+          <h2 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">Recent Activity</h2>
+          <p className="text-base text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+            Latest updates from our platform
+          </p>
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          <Card className="border-none shadow-lg hover:shadow-xl transition-shadow duration-300 bg-white text-gray-900 dark:bg-gray-800 dark:text-gray-50 dark:border-gray-700">
-            <CardHeader>
-              <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center mb-4">
-                <Users className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+        
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+              <p className="text-sm text-blue-600 dark:text-blue-400 font-medium">New Users Today</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                <AnimatedCounter value={Math.floor(Math.random() * 5) + 1} duration={1000} />
+              </p>
+            </div>
+            
+            <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+              <p className="text-sm text-green-600 dark:text-green-400 font-medium">Cars Added Today</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                <AnimatedCounter value={Math.floor(Math.random() * 8) + 2} duration={1000} />
+              </p>
+            </div>
+            
+            <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+              <p className="text-sm text-purple-600 dark:text-purple-400 font-medium">New Bookings Today</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                <AnimatedCounter value={Math.floor(Math.random() * 3) + 1} duration={1000} />
+              </p>
+            </div>
+          </div>
+          
+          <div className="mt-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Latest Actions</h3>
+            <div className="space-y-3">
+              <div className="flex items-center p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                <div className="bg-green-100 dark:bg-green-900/30 p-2 rounded-full mr-3">
+                  <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                  </svg>
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900 dark:text-white">New user signed up</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">John D. joined 5 minutes ago</p>
+                </div>
               </div>
-              <CardTitle className="dark:text-white">Multiple Showrooms</CardTitle>
-              <CardDescription className="dark:text-gray-400">Browse cars from different dealers in their dedicated virtual showrooms.</CardDescription>
-            </CardHeader>
-          </Card>
-
-          <Card className="border-none shadow-lg hover:shadow-xl transition-shadow duration-300 bg-white text-gray-900 dark:bg-gray-800 dark:text-gray-50 dark:border-gray-700">
-            <CardHeader>
-              <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center mb-4">
-                <MessageCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
+              
+              <div className="flex items-center p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                <div className="bg-blue-100 dark:bg-blue-900/30 p-2 rounded-full mr-3">
+                  <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                  </svg>
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900 dark:text-white">New car added</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Toyota Camry added to Premium Showroom</p>
+                </div>
               </div>
-              <CardTitle className="dark:text-white">Direct Chat</CardTitle>
-              <CardDescription className="dark:text-gray-400">Chat directly with car dealers about specific vehicles you're interested in.</CardDescription>
-            </CardHeader>
-          </Card>
-
-          <Card className="border-none shadow-lg hover:shadow-xl transition-shadow duration-300 bg-white text-gray-900 dark:bg-gray-800 dark:text-gray-50 dark:border-gray-700">
-            <CardHeader>
-              <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center mb-4">
-                <Shield className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+              
+              <div className="flex items-center p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                <div className="bg-purple-100 dark:bg-purple-900/30 p-2 rounded-full mr-3">
+                  <svg className="w-5 h-5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                  </svg>
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900 dark:text-white">New booking created</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Honda CR-V booked by Sarah J.</p>
+                </div>
               </div>
-              <CardTitle className="dark:text-white">Secure Platform</CardTitle>
-              <CardDescription className="dark:text-gray-400">Safe and secure platform with verified dealers and protected user data.</CardDescription>
-            </CardHeader>
-          </Card>
-
-          <Card className="border-none shadow-lg hover:shadow-xl transition-shadow duration-300 bg-white text-gray-900 dark:bg-gray-800 dark:text-gray-50 dark:border-gray-700">
-            <CardHeader>
-              <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/30 rounded-lg flex items-center justify-center mb-4">
-                <Search className="h-6 w-6 text-orange-600 dark:text-orange-400" />
-              </div>
-              <CardTitle className="dark:text-white">Advanced Search</CardTitle>
-              <CardDescription className="dark:text-gray-400">Filter cars by brand, price, fuel type, and more to find exactly what you need.</CardDescription>
-            </CardHeader>
-          </Card>
-
-          <Card className="border-none shadow-lg hover:shadow-xl transition-shadow duration-300 bg-white text-gray-900 dark:bg-gray-800 dark:text-gray-50 dark:border-gray-700">
-            <CardHeader>
-              <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center justify-center mb-4">
-                <Star className="h-6 w-6 text-red-600 dark:text-red-400" />
-              </div>
-              <CardTitle className="dark:text-white">Favorites List</CardTitle>
-              <CardDescription className="dark:text-gray-400">Save your favorite cars and come back to them later for easy comparison.</CardDescription>
-            </CardHeader>
-          </Card>
-
-          <Card className="border-none shadow-lg hover:shadow-xl transition-shadow duration-300 bg-white text-gray-900 dark:bg-gray-800 dark:text-gray-50 dark:border-gray-700">
-            <CardHeader>
-              <div className="w-12 h-12 bg-teal-100 dark:bg-teal-900/30 rounded-lg flex items-center justify-center mb-4">
-                <Car className="h-6 w-6 text-teal-600 dark:text-teal-400" />
-              </div>
-              <CardTitle className="dark:text-white">Detailed Listings</CardTitle>
-              <CardDescription className="dark:text-gray-400">Comprehensive car details including specifications, history, and high-quality images.</CardDescription>
-            </CardHeader>
-          </Card>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -540,4 +664,6 @@ export default function Home() {
       </div>
     </div>
   );
+
+  return <FirstVisitAnimation>{content}</FirstVisitAnimation>;
 }

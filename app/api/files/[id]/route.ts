@@ -2,63 +2,58 @@ import { NextResponse } from 'next/server';
 import { fileServices } from '@/lib/supabase/services/generalServices';
 import { chatServices } from '@/lib/supabase/services/generalServices';
 import { verifyToken } from '@/lib/auth';
+import { getSupabaseServiceRole } from '@/lib/supabase/server';
 
 export async function GET(
   request: Request,
   { params }: { params: { id: string } }
 ) {
   try {
-    // This endpoint is for serving files in chat, and access should be controlled by the chat API.
-    // We'll implement a token-based approach where the file URL includes user context via query params.
-    const url = new URL(request.url);
-    const userId = url.searchParams.get('userId');
-    const chatId = url.searchParams.get('chatId');
-
-    // If userId and chatId are provided, verify the user has access to the chat
-    if (userId && chatId) {
-      // Find the file in the database
-      const file = await fileServices.getFileById(params.id);
-      if (!file) {
-        return NextResponse.json(
-          { error: 'File not found' },
-          { status: 404 }
-        );
-      }
-
-      // In Supabase, we need to handle file access differently since the approach is different
-      // For now, we'll handle file serving differently by retrieving the file from storage
-      // Since files in the original model were stored as binary data in the DB,
-      // in Supabase we need to get the file from Supabase Storage or return the path data
-      // This is a simplified version - in real implementation you'd need to fetch the actual file content
-
-      // For now, we can return an error since we need to implement a proper file storage solution
+    // Find the file record in the database
+    const file = await fileServices.getFileById(params.id);
+    if (!file) {
       return NextResponse.json(
-        { error: 'File access in Supabase requires proper file storage implementation' },
-        { status: 501 } // Not implemented
-      );
-    } else {
-      // If no user/chat context provided, verify token
-      const token = request.headers.get('authorization')?.split(' ')[1];
-      if (!token) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
-
-      const decodedToken: any = verifyToken(token);
-      if (!decodedToken) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
-
-      // For proper implementation in Supabase, we'd need to either:
-      // 1. Fetch the file from Supabase Storage
-      // 2. Store file metadata in the DB and return the signed URL
-      // 3. Return file details for client to handle differently
-
-      // Placeholder implementation - we need to implement actual file serving
-      return NextResponse.json(
-        { error: 'File access in Supabase requires proper file storage implementation' },
-        { status: 501 } // Not implemented
+        { error: 'File not found' },
+        { status: 404 }
       );
     }
+
+    // Get Supabase client with service role to access storage
+    const supabase = getSupabaseServiceRole();
+
+    // Extract bucket name from the path (format: bucket-name/folder/filename)
+    const pathParts = file.path.split('/');
+    const bucketName = pathParts[0];
+    const filePath = pathParts.slice(1).join('/'); // Reconstruct the file path without bucket name
+
+    // Try to get the file from Supabase Storage
+    const { data, error } = await supabase
+      .storage
+      .from(bucketName) // Use the bucket from the stored path
+      .download(filePath); // Use the file path without bucket name
+
+    if (error) {
+      console.error('Error downloading file from storage:', error);
+      return NextResponse.json(
+        { error: 'File not found in storage' },
+        { status: 404 }
+      );
+    }
+
+    // Create a response with the file content
+    const blob = await data.arrayBuffer();
+    const buffer = Buffer.from(blob);
+
+    // Set the appropriate content type based on the file
+    const contentType = file.type || 'application/octet-stream';
+
+    return new NextResponse(buffer, {
+      headers: {
+        'Content-Type': contentType,
+        'Content-Length': file.size.toString(),
+        'Cache-Control': 'public, max-age=31536000', // Cache for 1 year
+      },
+    });
   } catch (error: any) {
     console.error('Get file error:', error);
     return NextResponse.json(

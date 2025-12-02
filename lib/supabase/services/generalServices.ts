@@ -437,25 +437,22 @@ export const visitServices = {
   // Function to get monthly visits data
   async getMonthlyVisitsData(): Promise<{ month: string; count: number }[]> {
     try {
-      // This would typically fetch data from a visits table grouped by month
-      // For demonstration purposes, we'll generate sample data based on current visit count
-      // In a full implementation, you'd want to store actual visit records with dates
+      // Fetch from the API endpoint that handles the monthly visits data
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/homepage/monthly-visits/data`, {
+        method: 'GET', // GET to get monthly visits data
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        cache: 'no-store', // Disable caching to ensure fresh data
+      });
 
-      const months = [
-        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-      ];
-
-      // For now, generate sample data - in a real implementation this would query actual data
-      // If you want to track visits by month specifically, you'd need to modify the visits table
-      // to include date information and group by month
-
-      const result = months.map((month, index) => ({
-        month,
-        count: Math.floor(Math.random() * 500) + 100 // Random data for now
-      }));
-
-      return result;
+      if (res.ok) {
+        const data = await res.json();
+        return data;
+      } else {
+        // If the API call fails, return empty array
+        return [];
+      }
     } catch (error) {
       console.error('Error in getMonthlyVisitsData:', error);
       return [];
