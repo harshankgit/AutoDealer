@@ -4,6 +4,8 @@ CREATE TABLE IF NOT EXISTS monthly_visits (
     year_month VARCHAR(7) NOT NULL UNIQUE, -- Format: 'YYYY-MM'
     month_name VARCHAR(20) NOT NULL,       -- Format: 'Jan 2024'
     visit_count INTEGER DEFAULT 0,
+    unique_users INTEGER DEFAULT 0,        -- Count of unique devices/users
+    last_updated_devices TEXT DEFAULT '[]', -- JSON array of device IDs to prevent double counting
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

@@ -7,6 +7,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { UserProvider } from '../context/user-context';
 import ServiceWorkerRegistration from '@/components/pwa/ServiceWorkerRegistration';
 import RealTimeNotifications from '@/components/realtime/RealTimeNotifications';
+import VisitTracker from '@/components/VisitTracker';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -42,6 +43,7 @@ export default function RootLayout({
           <UserProvider>
             <ServiceWorkerRegistration />
             <RealTimeNotifications />
+            <VisitTracker />
             <Navbar />
             <main>{children}</main>
             <Toaster />

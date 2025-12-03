@@ -24,9 +24,15 @@ export async function GET(request: Request) {
     let visitCount: number;
 
     if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 means no rows returned
-      // If there's a real error (not "no rows"), return 0
+      // If there's a real error (not "no rows"), return current count
       console.error('Error fetching current monthly visit count:', fetchError);
-      visitCount = 0;
+      // Try to return the count we'd have calculated
+      if (currentData && typeof currentData === 'object' && 'visit_count' in currentData) {
+        const count = (currentData as { visit_count: number }).visit_count;
+        visitCount = count + 1;
+      } else {
+        visitCount = 1; // Default to 1 if we can't get the current value
+      }
     } else if (fetchError && fetchError.code === 'PGRST116') {
       // If no row exists, start with 1
       visitCount = 1;

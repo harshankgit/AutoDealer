@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { bookingServices } from '@/lib/supabase/services/bookingService';
 import { roomServices } from '@/lib/supabase/services/generalServices';
 import { verifyToken } from '@/lib/auth';
+import { supabase } from '@/lib/supabase/client';
 
 export async function GET(request: Request) {
   try {
@@ -24,13 +25,33 @@ export async function GET(request: Request) {
     // For regular admin: only show bookings for their room
     const adminRoom = await roomServices.getRoomByadminid(decoded.userId);
     if (!adminRoom) {
+      console.log('No room found for admin ID:', decoded.userId);
       return NextResponse.json(
         { error: 'No room found for this admin' },
         { status: 404 }
       );
     }
 
+    console.log('Found room for admin:', adminRoom.id, adminRoom.name);
+
+    // Debug: Get all cars in this room first
+    const { data: carsInRoom, error: carsError } = await supabase
+      .from('cars')
+      .select('id')
+      .eq('roomid', adminRoom.id);
+
+    console.log('Cars in admin room:', carsInRoom, 'Error:', carsError);
+
+    // Debug: Get all bookings and their car IDs
+    const { data: allBookings, error: bookingsError } = await supabase
+      .from('bookings')
+      .select('id, carid');
+
+    console.log('All bookings:', allBookings, 'Error:', bookingsError);
+
     const bookings = await bookingServices.getBookingsByRoom(adminRoom.id);
+    console.log('Found', bookings.length, 'bookings for room');
+
     return NextResponse.json({ bookings });
   } catch (error) {
     console.error('Get bookings error:', error);

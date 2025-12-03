@@ -189,37 +189,75 @@ export const bookingServices = {
   // Get bookings by room ID
   async getBookingsByRoom(roomid: string): Promise<Booking[]> {
     try {
-      // First get all cars in the room
+      // First get all car IDs in the specified room
       const { data: carsData, error: carsError } = await supabase
         .from('cars')
         .select('id')
         .eq('roomid', roomid);
 
       if (carsError) {
-        console.error('Error getting cars by room:', carsError);
+        console.error('Error getting cars for room:', carsError);
         return [];
       }
 
       if (!carsData || carsData.length === 0) {
+        console.log('No cars found in room:', roomid);
         return [];
       }
 
-      // Extract car IDs
       const carIds = carsData.map(car => car.id);
 
-      // Then get bookings for those cars
-      const { data, error } = await supabase
+      // Get bookings for those cars
+      const { data: bookingsData, error: bookingsError } = await supabase
         .from('bookings')
-        .select('*, car:cars(title, brand, model, roomid), user:users(username, email)')
+        .select('*')
         .in('carid', carIds)
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Error getting bookings by room:', error);
+      if (bookingsError) {
+        console.error('Error getting bookings by room:', bookingsError);
         return [];
       }
 
-      return data as Booking[];
+      if (!bookingsData || bookingsData.length === 0) {
+        console.log('No bookings found for cars in room:', roomid, 'Car IDs:', carIds);
+        return [];
+      }
+
+      // Now fetch car and user details separately to enrich the data
+      const bookingIds = bookingsData.map(b => b.id);
+      const userIds = Array.from(new Set(bookingsData.map(b => b.userid)));
+      const carIdsInBookings = Array.from(new Set(bookingsData.map(b => b.carid)));
+
+      // Fetch car details
+      const { data: carDetails, error: carDetailsError } = await supabase
+        .from('cars')
+        .select('id, title, brand, model, roomid')
+        .in('id', carIdsInBookings);
+
+      // Fetch user details
+      const { data: userDetails, error: userDetailsError } = await supabase
+        .from('users')
+        .select('id, username, email')
+        .in('id', userIds);
+
+      // Create maps for quick lookup
+      const carMap = carDetails?.reduce((acc, car) => {
+        acc[car.id] = car;
+        return acc;
+      }, {} as Record<string, any>) || {};
+
+      const userMap = userDetails?.reduce((acc, user) => {
+        acc[user.id] = user;
+        return acc;
+      }, {} as Record<string, any>) || {};
+
+      // Add car and user details to bookings
+      return bookingsData.map(booking => ({
+        ...booking,
+        car: carMap[booking.carid],
+        user: userMap[booking.userid]
+      })) as Booking[];
     } catch (error) {
       console.error('Error in getBookingsByRoom:', error);
       return [];

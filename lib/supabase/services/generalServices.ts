@@ -437,22 +437,24 @@ export const visitServices = {
   // Function to get monthly visits data
   async getMonthlyVisitsData(): Promise<{ month: string; count: number }[]> {
     try {
-      // Fetch from the API endpoint that handles the monthly visits data
-      const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/homepage/monthly-visits/data`, {
-        method: 'GET', // GET to get monthly visits data
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        cache: 'no-store', // Disable caching to ensure fresh data
-      });
+      const { data, error } = await getSupabaseServiceRole()
+        .from('monthly_visits')
+        .select('*')
+        .order('year_month', { ascending: false })
+        .limit(12); // Get last 12 months
 
-      if (res.ok) {
-        const data = await res.json();
-        return data;
-      } else {
-        // If the API call fails, return empty array
+      if (error) {
+        console.error('Error fetching monthly visits data:', error);
         return [];
       }
+
+      // Format the data to match expected structure
+      const formattedData = data.map((item: any) => ({
+        month: item.month_name,
+        count: item.visit_count || 0
+      })).reverse(); // Reverse to show oldest first
+
+      return formattedData;
     } catch (error) {
       console.error('Error in getMonthlyVisitsData:', error);
       return [];
