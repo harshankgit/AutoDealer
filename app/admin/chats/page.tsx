@@ -11,20 +11,15 @@ import { useUser } from '@/context/user-context';
 
 interface ChatSummary {
   id: string;
-  carId: string;
+  roomid: string;
+  userid: string;
   car: {
     id: string;
     title: string;
-    image: string | null;
+    images: string[] | null;
     room: string;
   } | null;
   user: {
-    id: string;
-    username: string;
-    email: string;
-    phone: string;
-  } | null;
-  admin: {
     id: string;
     username: string;
     email: string;
@@ -33,12 +28,9 @@ interface ChatSummary {
     message: string;
     timestamp: string;
     senderId: string;
-    senderType: 'user' | 'admin' | 'superadmin';
-    isRead: boolean;
   } | null;
-  unreadCount: number;
-  updatedAt: string;
   messageCount: number;
+  updatedAt: string;
 }
 
 export default function AdminChatsPage() {
@@ -84,8 +76,8 @@ export default function AdminChatsPage() {
       if (response.ok) {
         // Sort chats by most recent message first
         const sortedChats = data.chats.sort((a: ChatSummary, b: ChatSummary) => {
-          const dateA = a.lastMessage?.timestamp ? new Date(a.lastMessage.timestamp).getTime() : 0;
-          const dateB = b.lastMessage?.timestamp ? new Date(b.lastMessage.timestamp).getTime() : 0;
+          const dateA = new Date(a.updatedAt).getTime();
+          const dateB = new Date(b.updatedAt).getTime();
           return dateB - dateA;
         });
         
@@ -201,7 +193,7 @@ export default function AdminChatsPage() {
           <div className="space-y-4">
             {chats.map((chat) => (
               <Link href={`/admin/chats/${chat.id}`} key={chat.id} className="block">
-                <Card className={`mb-4 transition-colors ${chat.unreadCount > 0 ? 'border-l-4 border-blue-500' : ''}`}>
+                <Card className="mb-4 transition-colors">
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between">
                       <div className="flex items-start space-x-4 flex-1 min-w-0">
@@ -211,11 +203,6 @@ export default function AdminChatsPage() {
                               {chat.user?.username ? getInitials(chat.user.username) : 'U'}
                             </AvatarFallback>
                           </Avatar>
-                          {chat.unreadCount > 0 && (
-                            <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                              {chat.unreadCount > 9 ? '9+' : chat.unreadCount}
-                            </span>
-                          )}
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex justify-between items-start">
@@ -226,18 +213,17 @@ export default function AdminChatsPage() {
                               </span>
                             </h3>
                             <span className="text-xs text-gray-500 whitespace-nowrap ml-2">
-                              {chat.lastMessage ? formatTime(chat.lastMessage.timestamp) : ''}
+                              {chat.lastMessage ? formatTime(chat.lastMessage.timestamp) : formatTime(chat.updatedAt)}
                             </span>
                           </div>
-                          
+
                           <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
                             {chat.car?.room ? `Room: ${chat.car.room}` : 'No Room'}
                           </p>
-                          
+
                           <div className="flex items-center mt-1">
                             {chat.lastMessage && (
-                              <p className={`text-sm truncate ${!chat.lastMessage.isRead && chat.lastMessage.senderType === 'user' ? 'font-semibold text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-300'}`}>
-                                {chat.lastMessage.senderType === 'user' ? '' : 'You: '}
+                              <p className="text-sm truncate text-gray-600 dark:text-gray-300">
                                 {chat.lastMessage.message ? chat.lastMessage.message.substring(0, 50) : 'No message'}
                                 {chat.lastMessage.message && chat.lastMessage.message.length > 50 ? '...' : ''}
                               </p>
@@ -248,17 +234,9 @@ export default function AdminChatsPage() {
                               </span>
                             )}
                           </div>
-                          
+
                           {chat.user && (
                             <div className="flex items-center mt-1 text-xs text-gray-500 dark:text-gray-400">
-                              {chat.user.phone && (
-                                <span className="flex items-center mr-3">
-                                  <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                                  </svg>
-                                  {chat.user.phone}
-                                </span>
-                              )}
                               {chat.user.email && (
                                 <span className="flex items-center truncate">
                                   <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">

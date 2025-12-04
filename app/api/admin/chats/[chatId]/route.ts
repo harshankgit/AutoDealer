@@ -30,35 +30,28 @@ export async function GET(request: Request, { params }: { params: { chatId: stri
       );
     }
 
-    const chatId = params.chatId;
-
-    // Find the specific chat by ID (this is different in Supabase - each row represents a single message)
-    // In Supabase we need to get all messages for a room, not a single chat object with nested messages
-    const chatMessages = await chatServices.getChatsByRoom(chatId); // Note: This might need adjustment
-
-    if (!chatMessages || chatMessages.length === 0) {
+    // The chatId parameter here is actually the userKey (format: roomid-senderid)
+    // We need to extract the roomid (first 36 chars including hyphens) and senderid
+    // UUID format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (8-4-4-4-12 = 36 chars total)
+    const roomIdLength = 36;
+    if (params.chatId.length <= roomIdLength + 1) { // +1 for the separator hyphen
       return NextResponse.json(
-        { error: 'Chat not found' },
-        { status: 404 }
+        { error: 'Invalid chat identifier format' },
+        { status: 400 }
       );
     }
 
-    // For Supabase, we might need to get the room information differently
-    // In Supabase, each row in the chats table is an individual message, not a conversation object
-    // Let's restructure this approach:
+    const roomid = params.chatId.substring(0, roomIdLength);
+    const senderid = params.chatId.substring(roomIdLength + 1); // +1 to skip the separator hyphen
 
-    // First, we need to get the room associated with these messages
-    // Since each message has a roomid, we can get the first one to use for authorization checks
-    if (chatMessages.length === 0) {
+    if (!roomid || !senderid || roomid.length !== 36 || senderid.length === 0) {
       return NextResponse.json(
-        { error: 'Chat not found' },
-        { status: 404 }
+        { error: 'Invalid chat identifier' },
+        { status: 400 }
       );
     }
 
-    const roomid = chatMessages[0].roomid;
-
-    // Only allow admin to access chats related to their room, unless superadmin
+    // Authorization check - ensure admin can only access their room's chats (do this first)
     if (decoded.role === 'admin') {
       const adminRoom = await roomServices.getRoomByadminid(decoded.userId);
       if (!adminRoom) {
@@ -76,6 +69,27 @@ export async function GET(request: Request, { params }: { params: { chatId: stri
         );
       }
     }
+
+    // Get all messages for this specific room
+    const chatMessages = await chatServices.getChatsByRoom(roomid);
+
+    if (!chatMessages || chatMessages.length === 0) {
+      return NextResponse.json(
+        { error: 'Chat not found' },
+        { status: 404 }
+      );
+    }
+
+    // For now, since we don't have recipient tracking in the schema, we'll return all messages
+    // from the room since this user is involved. In a complete implementation, we'd want to
+    // properly track and filter for messages between this admin and this specific user
+    // For now, return all messages in the room since the admin is viewing this user's chat
+    // (which they opened from the chat list showing this user's activity in this room)
+    const userMessages = chatMessages;
+
+    // In a more complete implementation, we might want to filter to show both user and admin messages
+    // For now, we'll show all messages in the room that involve the specific user
+    // In a real implementation, we'd have a more sophisticated system to track 1:1 conversations
 
     // Format the chat for response, with each row as a separate message
     const formattedChat = {
@@ -117,7 +131,17 @@ export async function POST(request: Request, { params }: { params: { chatId: str
       );
     }
 
-    const roomid = params.chatId; // In the current code chatId might be the room ID
+    // The chatId parameter here is actually the userKey (format: roomid-senderid)
+    // We need to extract the roomid to post the message
+    const [roomid, targetUserId] = params.chatId.split('-');
+
+    if (!roomid || !targetUserId) {
+      return NextResponse.json(
+        { error: 'Invalid chat identifier' },
+        { status: 400 }
+      );
+    }
+
     const { message, fileId, fileName, fileType } = await request.json();
 
     if (!message && !fileId) {
