@@ -46,6 +46,7 @@ export async function POST(req: Request) {
     const booking = await bookingServices.createBooking({
       carid: carId,
       userid: userId,
+      roomid: car.roomid, // Include the room ID from the car
       start_date: bookingDetails.startDate || new Date().toISOString(),
       end_date: bookingDetails.endDate || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // Default to 1 day from now
       total_price: bookingDetails.totalPrice || 0,

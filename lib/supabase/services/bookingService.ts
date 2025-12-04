@@ -190,7 +190,7 @@ export const bookingServices = {
   async getBookingsByRoom(roomid: string): Promise<Booking[]> {
     try {
       // First get all car IDs in the specified room
-      const { data: carsData, error: carsError } = await supabase
+      const { data: carsData, error: carsError } = await getSupabaseServiceRole()
         .from('cars')
         .select('id')
         .eq('roomid', roomid);
@@ -208,7 +208,7 @@ export const bookingServices = {
       const carIds = carsData.map(car => car.id);
 
       // Get bookings for those cars
-      const { data: bookingsData, error: bookingsError } = await supabase
+      const { data: bookingsData, error: bookingsError } = await getSupabaseServiceRole()
         .from('bookings')
         .select('*')
         .in('carid', carIds)
@@ -230,13 +230,13 @@ export const bookingServices = {
       const carIdsInBookings = Array.from(new Set(bookingsData.map(b => b.carid)));
 
       // Fetch car details
-      const { data: carDetails, error: carDetailsError } = await supabase
+      const { data: carDetails, error: carDetailsError } = await getSupabaseServiceRole()
         .from('cars')
         .select('id, title, brand, model, roomid')
         .in('id', carIdsInBookings);
 
       // Fetch user details
-      const { data: userDetails, error: userDetailsError } = await supabase
+      const { data: userDetails, error: userDetailsError } = await getSupabaseServiceRole()
         .from('users')
         .select('id, username, email')
         .in('id', userIds);
@@ -267,7 +267,7 @@ export const bookingServices = {
   // Get booking by ID
   async getBookingById(bookingId: string): Promise<Booking | null> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await getSupabaseServiceRole()
         .from('bookings')
         .select('*')
         .eq('id', bookingId)
@@ -288,7 +288,7 @@ export const bookingServices = {
   // Update booking
   async updateBooking(bookingId: string, bookingData: Partial<Booking>): Promise<Booking | null> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await getSupabaseServiceRole()
         .from('bookings')
         .update(bookingData)
         .eq('id', bookingId)
@@ -310,7 +310,7 @@ export const bookingServices = {
   // Delete booking
   async deleteBooking(bookingId: string): Promise<boolean> {
     try {
-      const { error } = await supabase
+      const { error } = await getSupabaseServiceRole()
         .from('bookings')
         .delete()
         .eq('id', bookingId);

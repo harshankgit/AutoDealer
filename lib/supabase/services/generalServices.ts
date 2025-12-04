@@ -126,7 +126,7 @@ export const roomServices = {
 
   async getRoomByadminid(adminid: string): Promise<Room | null> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await getSupabaseServiceRole()
         .from('rooms')
         .select('*')
         .eq('adminid', adminid)

@@ -11,27 +11,30 @@ import { useUser } from '@/context/user-context';
 
 interface Booking {
   id: string;
-  carId: {
+  carid: string;
+  userid: string;
+  roomid: string | null;
+  start_date: string;
+  end_date: string;
+  total_price: number;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  car: {
     id: string;
     title: string;
     brand: string;
     model: string;
-    year: number;
-    price: number;
-    images: string[];
-  };
-  roomid: {
+    year?: number;
+    price?: number;
+    images?: string[];
+    roomid: string;
+  } | null;
+  user: {
     id: string;
-    name: string;
-    location: string;
-  };
-  bookingDetails: {
-    phone: string;
-    notes?: string;
-  };
-  status: string;
-  createdAt: string;
-  updatedAt: string;
+    username: string;
+    email: string;
+  } | null;
 }
 
 export default function UserBookingsPage() {
@@ -145,16 +148,16 @@ export default function UserBookingsPage() {
                   <div className="flex justify-between items-start">
                     <div>
                       <CardTitle className="text-lg dark:text-white">
-                        {booking.carId ? (
+                        {booking.car ? (
                           <>
-                            {booking.carId.year} {booking.carId.brand} {booking.carId.model}
+                            {booking.car.year || ''} {booking.car.brand} {booking.car.model}
                           </>
                         ) : (
                           'Car details not available'
                         )}
                       </CardTitle>
                       <p className="text-gray-600 dark:text-gray-300 text-sm">
-                        {booking.carId?.title || 'No title available'}
+                        {booking.car?.title || 'No title available'}
                       </p>
                     </div>
                     <Badge 
@@ -174,37 +177,29 @@ export default function UserBookingsPage() {
                     <div className="flex items-center text-gray-600 dark:text-gray-300">
                       <Car className="h-4 w-4 mr-2" />
                       <span className="font-medium">
-                        {booking.carId?.price ? formatPrice(booking.carId.price) : 'Price not available'}
+                        {booking.car?.price ? formatPrice(booking.car.price) : 'Price not available'}
                       </span>
                     </div>
                     
                     <div className="flex items-center text-gray-600 dark:text-gray-300">
                       <MapPin className="h-4 w-4 mr-2 flex-shrink-0" />
                       <span className="truncate">
-                        {booking.roomid ? `${booking.roomid.name} - ${booking.roomid.location}` : 'Location not specified'}
+                        {booking.car?.roomid ? 'Showroom location available' : 'Location not specified'}
                       </span>
                     </div>
                     
                     <div className="flex items-center text-gray-600 dark:text-gray-300">
                       <Phone className="h-4 w-4 mr-2" />
-                      <span>{booking.bookingDetails?.phone || 'Phone not provided'}</span>
+                      <span>Phone information not provided</span>
                     </div>
-                    
-                    {booking.bookingDetails?.notes && (
-                      <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          <span className="font-medium">Notes:</span> {booking.bookingDetails?.notes}
-                        </p>
-                      </div>
-                    )}
                     
                     <div className="pt-3 flex justify-between items-center">
                       <div className="text-sm text-gray-500 dark:text-gray-400">
                         <Calendar className="h-4 w-4 inline mr-1" />
-                        {new Date(booking.createdAt).toLocaleDateString()}
+                        {new Date(booking.created_at).toLocaleDateString()}
                       </div>
-                      <Link href={booking.carId?.id ? `/chat/${booking.carId.id}` : '#'}>
-                        {!booking.carId?.id && (
+                      <Link href={booking.car?.id ? `/chat/${booking.car.id}` : '#'}>
+                        {!booking.car?.id && (
                           <span className="sr-only">Chat not available</span>
                         )}
                         <Button size="sm" variant="outline">

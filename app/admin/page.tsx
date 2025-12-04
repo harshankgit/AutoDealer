@@ -38,26 +38,30 @@ export default function AdminDashboard() {
   const [room, setRoom] = useState<Room | null>(null);
   interface Booking {
     id: string;
-    carId: {
+    carid: string;
+    userid: string;
+    roomid: string | null;
+    start_date: string;
+    end_date: string;
+    total_price: number;
+    status: string;
+    created_at: string;
+    updated_at: string;
+    car: {
       id: string;
       title: string;
       brand: string;
       model: string;
-      year: number;
-    } | string; // Could be string if not populated
-    userId: {
+      year?: number;
+      price?: number;
+      images?: string[];
+      roomid: string;
+    } | null;
+    user: {
       id: string;
       username: string;
       email: string;
-    } | string; // Could be string if not populated
-    roomid: string;
-    status: string;
-    bookingDetails: {
-      phone: string;
-      notes?: string;
-    };
-    createdAt: string;
-    updatedAt: string;
+    } | null;
   }
 
   // Define ChatMessage interface
@@ -118,6 +122,8 @@ export default function AdminDashboard() {
   const [currentBookingId, setCurrentBookingId] = useState<string | null>(null);
   const [currentStatus, setCurrentStatus] = useState<string>('');
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
   const router = useRouter();
   const { user, loading } = useUser(); // Use context instead of local state
   const { notifications, unreadCount, addNotification, markAsRead, markAllAsRead } = useRealtimeNotifications();
@@ -320,8 +326,13 @@ export default function AdminDashboard() {
         )
       );
 
-      // Show success message (you can use a toast library if you have one)
-      alert('Booking status updated successfully!');
+      setIsStatusModalOpen(false);
+      setCurrentBookingId(null);
+      setCurrentStatus('');
+
+      // Show success message in modal
+      setSuccessMessage('Booking status updated successfully!');
+      setIsSuccessModalOpen(true);
     } catch (error: any) {
       console.error('Error updating booking status:', error);
       alert(error.message || 'Failed to update booking status');
@@ -845,27 +856,23 @@ export default function AdminDashboard() {
                           <tr key={booking.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                {typeof booking.carId === 'object' && booking.carId ? booking.carId.title : 'Car not found'}
+                                {booking.car ? booking.car.title : 'Car not found'}
                               </div>
                               <div className="text-sm text-gray-500 dark:text-gray-400">
-                                {typeof booking.carId === 'object' && booking.carId ? `${booking.carId.year} ${booking.carId.brand} ${booking.carId.model}` : ''}
+                                {booking.car ? `${booking.car.year || ''} ${booking.car.brand} ${booking.car.model}` : ''}
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                {typeof booking.userId === 'object' && booking.userId ? booking.userId.username : 'Customer'}
+                                {booking.user?.username || 'Customer'}
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm text-gray-500 dark:text-gray-300">
-                                <div className="flex items-center">
-                                  <Phone className="w-4 h-4 mr-1" />
-                                  {booking.bookingDetails?.phone || 'N/A'}
-                                </div>
-                                {typeof booking.userId === 'object' && booking.userId?.email && (
-                                  <div className="flex items-center mt-1">
+                                {booking.user?.email && (
+                                  <div className="flex items-center">
                                     <Mail className="w-4 h-4 mr-1" />
-                                    {booking.userId.email}
+                                    {booking.user.email}
                                   </div>
                                 )}
                               </div>
@@ -881,34 +888,35 @@ export default function AdminDashboard() {
                               </span>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-                              {new Date(booking.createdAt).toLocaleDateString()}
+                              {new Date(booking.created_at).toLocaleDateString()}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                               <div className="flex flex-col sm:flex-row gap-2">
-                                {typeof booking.carId === 'object' && typeof booking.userId === 'object' && booking.carId?.id && booking.userId?.id && (
-                                  <Link href={`/admin/chats?carId=${booking.carId.id}&userId=${booking.userId.id}`}>
+                                {booking.car?.id && booking.user?.id ? (
+                                  <Link href={`/admin/chats?carId=${booking.car.id}&userId=${booking.user.id}`}>
                                     <Button className="bg-green-600 hover:bg-green-700 text-white">
                                       <MessageCircle className="h-4 w-4 mr-2" />
                                       Chat
                                     </Button>
                                   </Link>
+                                ) : (
+                                  <Button variant="outline" disabled>
+                                    <MessageCircle className="h-4 w-4 mr-2" />
+                                    Chat
+                                  </Button>
                                 )}
-                                {typeof booking.carId === 'object' && booking.carId?.id && (
-                                  <Link href={`/cars/${booking.carId.id}`}>
+                                {booking.car?.id ? (
+                                  <Link href={`/cars/${booking.car.id}`}>
                                     <Button variant="outline">
                                       View Car
                                     </Button>
                                   </Link>
+                                ) : (
+                                  <Button variant="outline" disabled>
+                                    View Car
+                                  </Button>
                                 )}
                                 <div className="flex items-center space-x-2">
-                                  <span className={`px-2 text-xs rounded border ${
-                                    booking.status === 'Pending' ? 'bg-yellow-100 border-yellow-300 text-yellow-800 dark:bg-yellow-900/20 dark:border-yellow-700 dark:text-yellow-300' :
-                                    booking.status === 'Confirmed' ? 'bg-green-100 border-green-300 text-green-800 dark:bg-green-900/20 dark:border-green-700 dark:text-green-300' :
-                                    booking.status === 'Completed' ? 'bg-blue-100 border-blue-300 text-blue-800 dark:bg-blue-900/20 dark:border-blue-700 dark:text-blue-300' :
-                                    'bg-red-100 border-red-300 text-red-800 dark:bg-red-900/20 dark:border-red-700 dark:text-red-300'
-                                  }`}>
-                                    {booking.status}
-                                  </span>
                                   <Button
                                     variant="outline"
                                     size="sm"
@@ -917,9 +925,12 @@ export default function AdminDashboard() {
                                       setCurrentStatus(booking.status);
                                       setIsStatusModalOpen(true);
                                     }}
-                                    className="text-xs"
+                                    className="text-xs flex items-center min-w-[60px] justify-center"
                                   >
-                                    Change
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    </svg>
+                                    Edit
                                   </Button>
                                 </div>
                               </div>
@@ -1097,6 +1108,28 @@ export default function AdminDashboard() {
             </Button>
             <Button onClick={handleStatusConfirm}>
               Update Status
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Success Modal */}
+      <Dialog open={isSuccessModalOpen} onOpenChange={setIsSuccessModalOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="text-green-600 flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              Status Updated
+            </DialogTitle>
+            <DialogDescription>
+              {successMessage}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setIsSuccessModalOpen(false)}>
+              OK
             </Button>
           </DialogFooter>
         </DialogContent>
