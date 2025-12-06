@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Users, Home, Car, BarChart3, Settings, Loader2, Trash2, Edit, Eye } from 'lucide-react';
+import { Users, Home, Car, BarChart3, Settings, Loader2, Trash2, Edit, Eye, MessageCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useUser } from '@/context/user-context';
 
@@ -882,48 +882,23 @@ export default function SuperAdminDashboard() {
           <TabsContent value="chats" className="space-y-6">
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold dark:text-white">All Chats</h2>
+              <Link href="/admin/superadmin/chats">
+                <Button className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800">
+                  Open Chat Panel
+                </Button>
+              </Link>
             </div>
 
-            {chats.length === 0 ? (
-              <div className="text-center py-16">
-                <BarChart3 className="h-16 w-16 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-gray-600 dark:text-gray-300 mb-2">No chats found</h3>
-                <p className="text-gray-500 dark:text-gray-400">There are no chat conversations in the system yet.</p>
-              </div>
-            ) : (
-              <div className="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                    <thead className="bg-gray-50 dark:bg-gray-700">
-                      <tr>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Car</th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Customer</th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Dealer</th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Last Message</th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Date</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                      {chats.map((chat) => (
-                        <tr key={chat.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900 dark:text-white">{chat.carId?.title || 'Unknown Car'}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{chat.userId?.username || 'Unknown'}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{chat.adminid?.username || 'Unknown'}</td>
-                          <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-300 max-w-xs truncate">
-                            {chat.lastMessage ? chat.lastMessage.message : 'No messages yet'}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-                            {new Date(chat.updatedAt).toLocaleDateString()}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
+            <div className="text-center py-16">
+              <MessageCircle className="h-16 w-16 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-600 dark:text-gray-300 mb-2">Chat Panel Available</h3>
+              <p className="text-gray-500 dark:text-gray-400 mb-4">Use the chat panel to manage all conversations</p>
+              <Link href="/admin/superadmin/chats">
+                <Button className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800">
+                  Go to Chat Panel
+                </Button>
+              </Link>
+            </div>
           </TabsContent>
 
           <TabsContent value="settings" className="space-y-6">

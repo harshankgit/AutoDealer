@@ -3,7 +3,7 @@ import { verifyToken } from '@/lib/auth';
 import { carServices } from '@/lib/supabase/services/carService';
 import { bookingServices } from '@/lib/supabase/services/bookingService';
 import { userServices } from '@/lib/supabase/services/userService';
-import { roomServices } from '@/lib/supabase/services/generalServices';
+import { roomServices, visitServices } from '@/lib/supabase/services/generalServices';
 
 export async function GET(request: Request) {
   try {
@@ -45,11 +45,15 @@ export async function GET(request: Request) {
       const confirmedBookings = bookings.filter(booking => booking.status === 'Confirmed');
       const totalRevenue = confirmedBookings.reduce((sum, booking) => sum + (booking.total_price || 0), 0);
 
+      // Get total views for all of the admin's cars efficiently
+      const carIds = cars.map(car => car.id);
+      const totalViews = await visitServices.getTotalVisitsByCarIds(carIds);
+
       const stats = {
         totalCars,
         availableCars,
         soldCars,
-        totalViews: 0, // Views might be tracked differently or not at all in your system
+        totalViews,
         totalBookings: bookings.length,
         confirmedBookings: confirmedBookingsCount,
         pendingBookings: pendingBookingsCount,
@@ -82,11 +86,15 @@ export async function GET(request: Request) {
       const confirmedBookings = bookings.filter(booking => booking.status === 'Confirmed');
       const totalRevenue = confirmedBookings.reduce((sum, booking) => sum + (booking.total_price || 0), 0);
 
+      // Get total views for all cars on the platform efficiently
+      const carIds = cars.map(car => car.id);
+      const totalViews = await visitServices.getTotalVisitsByCarIds(carIds);
+
       const stats = {
         totalCars,
         availableCars,
         soldCars,
-        totalViews: cars.length * 15, // Mock data for now
+        totalViews,
         totalBookings,
         confirmedBookings: confirmedBookingsCount,
         pendingBookings: pendingBookingsCount,

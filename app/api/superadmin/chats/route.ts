@@ -14,31 +14,21 @@ export async function GET(request: Request) {
       );
     }
 
-    // Get ALL chats across the system for superadmin
-    const allChats = await chatServices.getAllChats();
-
-    // Group messages by room to create chat summaries (since in Supabase each row is an individual message)
-    const chatsByRoom: { [roomid: string]: any[] } = {};
-    allChats.forEach(chat => {
-      if (!chatsByRoom[chat.roomid]) {
-        chatsByRoom[chat.roomid] = [];
-      }
-      chatsByRoom[chat.roomid].push(chat);
-    });
+    // Get ALL conversations across the system for superadmin
+    const allConversations = await chatServices.getAllConversations();
 
     // Format the chat summaries to include last message details
-    const chatSummaries = Object.entries(chatsByRoom).map(([roomid, roomChats]) => {
-      const lastMessage = roomChats.length > 0 ? roomChats[roomChats.length - 1] : null;
-
+    const chatSummaries = allConversations.map((conversation) => {
       return {
-        roomid: roomid,
-        lastMessage: lastMessage ? {
-          message: lastMessage.message,
-          timestamp: lastMessage.timestamp,
-          senderId: lastMessage.senderid,
-        } : null,
-        messageCount: roomChats.length,
-        updatedAt: lastMessage?.timestamp || new Date().toISOString(),
+        id: conversation.id,
+        roomid: conversation.roomid,
+        userid: conversation.userid,
+        roomName: (conversation as any).room?.name || 'Unknown Room',
+        userName: (conversation as any).user?.username || 'Unknown User',
+        lastMessageAt: conversation.last_message_at,
+        updatedAt: conversation.updated_at,
+        isActive: conversation.is_active,
+        unreadCount: conversation.unread_count
       };
     });
 

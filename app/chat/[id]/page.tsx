@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import {
   ArrowLeft,
   Send,
@@ -16,7 +17,15 @@ import {
   Loader2,
   Paperclip,
   X,
+  Image as ImageIcon,
+  FileText,
+  Video,
+  MapPin,
+  Clock,
+  Calendar,
+  DollarSign
 } from "lucide-react";
+import { usePusher } from "@/hooks/usePusher";
 
 interface Car {
   id: string;
@@ -34,22 +43,47 @@ interface Car {
     id: string;
     username: string;
   };
+  description?: string;
+  mileage?: number;
+  fuel_type?: string;
+  transmission?: string;
 }
 
 interface Message {
   id: string;
-  senderId: {
-    id: string;
-    username: string;
-  };
+  conversation_id: string;
+  senderid: string;
   message: string;
-  fileUrl?: string;
-  fileName?: string;
-  fileType?: string;
+  message_type: string;
+  car_details?: any;
+  file_url?: string;
+  file_name?: string;
+  file_type?: string;
+  is_read: boolean;
   timestamp: string;
+  created_at: string;
+  sender: {
+    username: string;
+    role: string;
+  };
 }
 
-export default function ChatPage() {
+interface Conversation {
+  id: string;
+  roomid: string;
+  userid: string;
+  created_at: string;
+  updated_at: string;
+  last_message_at: string;
+  is_active: boolean;
+  unread_count: number;
+  room: {
+    name: string;
+    adminid: string;
+  };
+}
+
+export default function NewChatPage() {
   const params = useParams();
   const router = useRouter();
   const p = params ?? {};
@@ -67,12 +101,18 @@ export default function ChatPage() {
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState("");
   const [user, setUser] = useState<any>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const [roomName, setRoomName] = useState<string>('Loading room...');
+  const [isTyping, setIsTyping] = useState(false);
+  const [adminIsTyping, setAdminIsTyping] = useState(false);
+  const [isTypingTimer, setIsTypingTimer] = useState<NodeJS.Timeout | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const pusherService = usePusher();
 
   useEffect(() => {
-    if (!carId) return; // wait until param available
+    if (!carId) return;
     const userData = localStorage.getItem("user");
     const token = localStorage.getItem("token");
     if (!userData || !token) {
@@ -80,13 +120,28 @@ export default function ChatPage() {
       return;
     }
     setUser(JSON.parse(userData));
-    fetchCarAndMessages(token);
+
+    initializeChat(token);
+
+    return () => {
+      if (conversationId && pusherService) {
+        pusherService.unsubscribeFromChannel(`chat-${conversationId}`);
+      }
+
+      // Clear typing timer on unmount
+      if (isTypingTimer) {
+        clearTimeout(isTypingTimer);
+      }
+    };
   }, [carId, router]);
 
-  const fetchCarAndMessages = async (token: string) => {
-    try {
-      setError("");
+  useEffect(() => {
+    // Scroll to bottom when messages change
+    scrollToBottom();
+  }, [messages]);
 
+  const initializeChat = async (token: string) => {
+    try {
       // Fetch car details (public)
       const carResponse = await fetch(`/api/cars/${carId}`);
       const carData = await carResponse.json();
@@ -106,77 +161,181 @@ export default function ChatPage() {
           }
         }
 
-        // Fetch admin details to get dealer name
-        if (carData.car?.adminid) {
-          try {
-            const adminResponse = await fetch(`/api/users/${carData.car.adminid}`);
-            const adminData = await adminResponse.json();
+        // Start or get conversation
+        const startConvResponse = await fetch('/api/v2/chat/start-conversation', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ carId }),
+        });
 
-            if (adminResponse.ok && adminData.user) {
-              // Update the car object to include admin info
-              setCar(prev => prev ? {
-                ...prev,
-                adminid: {
-                  id: adminData.user.id,
-                  username: adminData.user.username
-                }
-              } : null);
-            }
-          } catch (error) {
-            console.error('Failed to fetch admin details:', error);
+        if (startConvResponse.ok) {
+          const convData = await startConvResponse.json();
+          setConversationId(convData.conversationId);
+
+          // Subscribe to real-time events
+          if (convData.conversationId) {
+            subscribeToChatEvents(convData.conversationId);
           }
+
+          // Load messages for this conversation
+          await fetchMessages(convData.conversationId, token);
+
+          // If the start-conversation API returned a new message (like car details),
+          // make sure it's not duplicated by the Pusher event
+          if (convData.newMessage) {
+            // The fetchMessages call should have already included this message,
+            // so any Pusher event for this message will be deduplicated
+            console.log('Start conversation created message:', convData.newMessage);
+          }
+        } else {
+          const errorData = await startConvResponse.json();
+          setError(errorData.error || "Failed to start conversation");
         }
       } else {
         setCar(null);
         setError(carData.error || "Car not found");
-        setIsLoading(false);
-        return;
-      }
-
-      // Fetch chat for this car (requires auth)
-      const chatResponse = await fetch(`/api/chat?carId=${carId}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (chatResponse.status === 401) {
-        // Unauthorized — token expired or invalid
-        setError("Unauthorized. Please login again.");
-        // optional: redirect to login
-        // router.push('/login');
-        setMessages([]);
-        setIsLoading(false);
-        return;
-      }
-
-      const chatData = await chatResponse.json();
-
-      if (chatResponse.ok) {
-        if (chatData.chat) {
-          setMessages(chatData.chat.messages || []);
-        } else {
-          setMessages([]); // No existing chat, start fresh
-        }
-      } else {
-        setError(chatData.error || "Failed to fetch messages");
-        setMessages([]);
       }
     } catch (err) {
-      console.error("fetchCarAndMessages error:", err);
-      setError("Failed to load chat");
-      setMessages([]);
+      console.error("initializeChat error:", err);
+      setError("Failed to initialize chat");
     } finally {
       setIsLoading(false);
     }
   };
 
+  const subscribeToChatEvents = (conversationId: string) => {
+    // Subscribe to real-time message events
+    if (pusherService) {
+      pusherService.subscribeToChannel(`chat-${conversationId}`, 'new-message', (data: any) => {
+        console.log('Received new message via Pusher:', data); // Debug log
+        setMessages(prev => {
+          // Avoid duplicate messages - check if message exists or if it's the optimistic message we sent
+          const existingMsgIndex = prev.findIndex(msg => msg.id === data.message.id);
+
+          if (existingMsgIndex !== -1) {
+            // If it's an optimistic message we sent, update it with server data
+            const existingMsg = prev[existingMsgIndex];
+            if (existingMsg.id.startsWith('temp-')) {
+              // Update the optimistic message with server data
+              const updatedMessages = [...prev];
+              updatedMessages[existingMsgIndex] = {
+                ...data.message,
+                sender: data.message.sender || data.sender || { username: 'Unknown', role: 'user' }
+              };
+              return updatedMessages;
+            }
+            // If it's not a temp message and already exists, return as is to avoid duplicates
+            return prev;
+          } else {
+            // Check if the message is already in the list by content/timestamp to prevent duplicates
+            // This handles cases where a message might have been added via fetchMessages before this Pusher event
+            const duplicateByContent = prev.some(msg =>
+              msg.message === data.message.message &&
+              msg.timestamp === data.message.timestamp &&
+              msg.senderid === data.message.senderid
+            );
+
+            if (duplicateByContent) {
+              return prev;
+            }
+
+            // If message doesn't exist, add it (this is for messages from other participants)
+            // Ensure the message structure is consistent with what the frontend expects
+            const formattedMessage = {
+              ...data.message,
+              sender: data.message.sender || data.sender || { username: 'Unknown', role: 'user' }
+            };
+            return [...prev, formattedMessage];
+          }
+        });
+      });
+    }
+
+    // Subscribe to typing events
+    if (pusherService) {
+      pusherService.subscribeToChannel(`chat-${conversationId}`, 'typing-status', (data: any) => {
+        console.log('Received typing status via Pusher:', data); // Debug log
+        if (data.userId !== user?.id) { // Show typing status for others, not self
+          if (data.isTyping) {
+            setAdminIsTyping(true);
+          } else {
+            setAdminIsTyping(false);
+          }
+        }
+      });
+    }
+  };
+
+  const fetchMessages = async (convId: string, token: string) => {
+    try {
+      console.log('Fetching messages for conversation:', convId); // Debug log
+      const response = await fetch(`/api/v2/chat?conversationId=${convId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Fetched messages:', data.messages); // Debug log
+
+        // Ensure each message has a proper sender object
+        const formattedMessages = (data.messages || []).map((msg: Message) => ({
+          ...msg,
+          sender: msg.sender || { username: 'Unknown', role: 'user' }
+        }));
+
+        setMessages(formattedMessages);
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || "Failed to fetch messages");
+      }
+    } catch (err) {
+      console.error("fetchMessages error:", err);
+      setError("Failed to fetch messages");
+    }
+  };
+
+  // Function to handle typing indicator for user with proper rate limiting
+  const handleUserTyping = () => {
+    if (!conversationId || !user || !pusherService) return;
+
+    // Set typing to true if not already
+    if (!isTyping) {
+      setIsTyping(true);
+
+      // Send typing indicator via the pusher service
+      pusherService.sendTypingIndicator(conversationId, true);
+    }
+
+    // Clear any existing timer
+    if (isTypingTimer) {
+      clearTimeout(isTypingTimer);
+    }
+
+    // Set a new timer to stop typing after a delay of inactivity
+    const timer = setTimeout(() => {
+      setIsTyping(false);
+
+      // Send stop typing indicator via the pusher service
+      pusherService.sendTypingIndicator(conversationId, false);
+    }, 1500); // Stop typing indicator after 1.5 seconds of inactivity
+
+    setIsTypingTimer(timer);
+  };
+
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if ((!newMessage.trim() && !selectedFile) || !user || !car) return;
+    if (!newMessage.trim() || !user || !conversationId) return;
 
     setIsSending(true);
     setError("");
+
+    // Optimistically add the message to UI before API call
+    const tempMessageId = `temp-${Date.now()}`;
 
     try {
       const token = localStorage.getItem("token");
@@ -184,61 +343,37 @@ export default function ChatPage() {
         setError("Authentication token not found.");
         setIsSending(false);
         router.push("/login");
+        // Remove the optimistic message if there's an issue
+        setMessages(prev => prev.filter(msg => msg.id !== tempMessageId));
         return;
       }
-
-      let fileId = null;
-      let fileName = null;
-      let fileType = null;
-
-      // Upload file if selected
-      if (selectedFile) {
-        const uploadFormData = new FormData();
-        uploadFormData.append("file", selectedFile);
-
-        const token = localStorage.getItem("token");
-        const uploadRes = await fetch("/api/upload", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          body: uploadFormData,
-        });
-
-        if (!uploadRes.ok) {
-          const uploadError = await uploadRes.json();
-          setError(uploadError.error || "File upload failed");
-          setIsSending(false);
-          return;
+      const optimisticMessage = {
+        id: tempMessageId,
+        conversation_id: conversationId,
+        senderid: user.id,
+        message: newMessage,
+        message_type: 'text',
+        is_read: false,
+        timestamp: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+        sender: {
+          username: user.username,
+          role: user.role,
         }
+      };
 
-        const uploadData = await uploadRes.json();
-        fileId = uploadData.fileId;
-        fileName = uploadData.fileName;
-        fileType = uploadData.fileType;
-      }
+      setMessages(prev => [...prev, optimisticMessage]);
 
-      // Ensure receiver exists - car.adminid can be a string ID or an object
-      const receiverId = typeof car.adminid === 'object' ? car.adminid.id : car.adminid;
-      if (!receiverId) {
-        setError("Receiver (dealer) not available for this car.");
-        setIsSending(false);
-        return;
-      }
-
-      const response = await fetch("/api/chat", {
+      const response = await fetch("/api/v2/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          carId: car.id,
-          receiverId,
-          message: newMessage || null,
-          fileId,
-          fileName,
-          fileType,
+          conversationId,
+          message: newMessage,
+          message_type: 'text',
         }),
       });
 
@@ -247,23 +382,39 @@ export default function ChatPage() {
       if (response.status === 401) {
         setError("Unauthorized. Please login again.");
         router.push("/login");
+        // Remove the optimistic message if auth fails
+        setMessages(prev => prev.filter(msg => msg.id !== tempMessageId));
         return;
       }
 
       if (response.ok) {
-        // Refresh messages and car info
-        await fetchCarAndMessages(token);
+        // Update the optimistic message with the actual server response data
+        setMessages(prev =>
+          prev.map(msg =>
+            msg.id === tempMessageId
+              ? { ...data.data, sender: data.data.sender || { username: user.username, role: user.role } }
+              : msg
+          )
+        );
+
+        // Reset input
         setNewMessage("");
-        setSelectedFile(null);
-        setUploadProgress(0);
       } else {
         setError(data.error || "Failed to send message");
+        // Remove the optimistic message if API fails
+        setMessages(prev => prev.filter(msg => msg.id !== tempMessageId));
       }
     } catch (error) {
       setError("Network error. Please try again.");
+      // Remove the optimistic message if there's a network error
+      setMessages(prev => prev.filter(msg => msg.id !== tempMessageId));
     } finally {
       setIsSending(false);
     }
+  };
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   const formatPrice = (price: number) => {
@@ -281,6 +432,97 @@ export default function ChatPage() {
     });
   };
 
+  const formatDate = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    if (date.toDateString() === today.toDateString()) {
+      return "Today";
+    } else if (date.toDateString() === yesterday.toDateString()) {
+      return "Yesterday";
+    } else {
+      return date.toLocaleDateString();
+    }
+  };
+
+  const renderMessageContent = (message: Message) => {
+    if (message.message_type === 'car_details' && message.car_details) {
+      const carDetails = message.car_details;
+      return (
+        <div className="bg-white dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
+          <div className="flex items-start space-x-3">
+            {carDetails.images && carDetails.images[0] && (
+              <div className="flex-shrink-0">
+                <img
+                  src={carDetails.images[0]}
+                  alt={carDetails.title}
+                  className="w-16 h-16 object-cover rounded-md"
+                />
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <h4 className="font-semibold text-gray-900 dark:text-white truncate">{carDetails.title}</h4>
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                {carDetails.year} {carDetails.brand} {carDetails.model}
+              </p>
+              <p className="text-lg font-bold text-blue-600 dark:text-blue-400 mt-1">
+                {formatPrice(carDetails.price)}
+              </p>
+              <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mt-2">
+                <MapPin className="h-3 w-3 mr-1" />
+                <span>{carDetails.room_name || roomName}</span>
+              </div>
+              <Button
+                className="mt-2 text-xs"
+                onClick={() => router.push(`/cars/${carDetails.id}`)}
+              >
+                View Car
+              </Button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (message.file_url) {
+      return (
+        <div className="mt-2">
+          {message.file_type?.startsWith('image') && (
+            <a href={message.file_url} target="_blank" rel="noopener noreferrer">
+              <img
+                src={message.file_url}
+                alt={message.file_name}
+                className="max-w-xs rounded-lg border border-gray-200 dark:border-gray-600"
+              />
+            </a>
+          )}
+          {message.file_type?.startsWith('video') && (
+            <video
+              src={message.file_url}
+              controls
+              className="max-w-xs rounded-lg border border-gray-200 dark:border-gray-600"
+            />
+          )}
+          {(message.file_type === 'application/pdf' || message.file_type?.includes('pdf')) && (
+            <a
+              href={message.file_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center text-blue-500 hover:underline"
+            >
+              <FileText className="h-4 w-4 mr-1" />
+              {message.file_name || "PDF Document"}
+            </a>
+          )}
+        </div>
+      );
+    }
+
+    return <p className="text-sm">{message.message}</p>;
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center">
@@ -292,7 +534,7 @@ export default function ChatPage() {
     );
   }
 
-  if (!car) {
+  if (!car || !conversationId) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center">
         <div className="text-center">
@@ -313,7 +555,7 @@ export default function ChatPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Back Button */}
         <div className="mb-6">
           <Link href={`/cars/${car.id}`}>
@@ -332,7 +574,7 @@ export default function ChatPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Car Info Sidebar */}
           <div className="lg:col-span-1">
             <Card className="sticky top-6">
@@ -371,8 +613,7 @@ export default function ChatPage() {
                     <strong>Showroom:</strong> {roomName}
                   </p>
                   <p className="text-sm text-gray-600">
-                    <strong>Dealer:</strong>{" "}
-                    {typeof car.adminid === 'object' ? car.adminid.username : "Car Dealer"}
+                    <strong>Dealer:</strong> {car.adminid && typeof car.adminid === 'object' ? car.adminid.username : "Car Dealer"}
                   </p>
                 </div>
               </CardContent>
@@ -380,178 +621,130 @@ export default function ChatPage() {
           </div>
 
           {/* Chat Area */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-3">
             <Card className="h-[600px] flex flex-col">
               <CardHeader className="border-b">
-                <CardTitle className="flex items-center">
-                  <MessageCircle className="h-5 w-5 mr-2" />
-                  Chat with {typeof car.adminid === 'object' ? car.adminid.username : "Car Dealer"}
-                </CardTitle>
+                <div className="flex justify-between items-center">
+                  <CardTitle className="flex items-center">
+                    <MessageCircle className="h-5 w-5 mr-2" />
+                    Chat with {car.adminid && typeof car.adminid === 'object' ? car.adminid.username : "Car Dealer"}
+                  </CardTitle>
+                  {adminIsTyping && (
+                    <div className="text-sm text-blue-600 dark:text-blue-400">
+                      Dealer is typing...
+                    </div>
+                  )}
+                </div>
               </CardHeader>
 
               {/* Messages */}
               <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
-                {messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`flex ${
-                      (message.senderId?.id || message.senderId) === user?.id
-                        ? "justify-end"
-                        : "justify-start"
-                    }`}
-                  >
-                    <div
-                      className={`flex items-start space-x-2 max-w-xs lg:max-w-md ${
-                        (message.senderId?.id || message.senderId) === user?.id
-                          ? "flex-row-reverse space-x-reverse"
-                          : ""
-                      }`}
-                    >
-                      <Avatar className="w-8 h-8">
-                        <AvatarFallback>
-                          {message.senderId?.id === user?.id ? (
-                            <User className="h-4 w-4" />
-                          ) : (
-                            message.senderId?.username
-                              ?.charAt(0)
-                              .toUpperCase() || "U"
-                          )}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div
-                        className={`rounded-lg px-3 py-2 ${
-                          (message.senderId?.id || message.senderId) ===
-                          user?.id
-                            ? "bg-blue-600 text-white"
-                            : "bg-gray-100 text-gray-900"
-                        }`}
-                      >
-                        {message.fileUrl && (
-                          <div className="mb-2">
-                            {message.fileType === "image" && (
-                              <img
-                                src={message.fileUrl}
-                                alt={message.fileName || "Image"}
-                                className="max-w-xs rounded-lg"
-                              />
-                            )}
-                            {message.fileType === "video" && (
-                              <video
-                                src={message.fileUrl}
-                                controls
-                                className="max-w-xs rounded-lg"
-                              />
-                            )}
-                            {(message.fileType === "pdf" ||
-                              message.fileType === "document") && (
-                              <a
-                                href={message.fileUrl}
-                                download
-                                className="flex items-center text-blue-400 hover:underline"
-                              >
-                                📄 {message.fileName}
-                              </a>
-                            )}
-                            {message.fileType === "audio" && (
-                              <audio src={message.fileUrl} controls />
-                            )}
+                {messages.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-gray-500">
+                    <MessageCircle className="h-12 w-12 mb-4" />
+                    <p>No messages yet. Start the conversation!</p>
+                  </div>
+                ) : (
+                  messages.map((message, index) => {
+                    // Group messages by same sender and date
+                    const currentMessageDate = formatDate(message.timestamp);
+                    const prevMessageDate = index > 0 ? formatDate(messages[index - 1].timestamp) : null;
+
+                    return (
+                      <div key={message.id}>
+                        {(index === 0 || prevMessageDate !== currentMessageDate) && (
+                          <div className="text-center my-4">
+                            <span className="text-xs bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-1 rounded-full">
+                              {currentMessageDate}
+                            </span>
                           </div>
                         )}
-                        {message.message && (
-                          <p className="text-sm">{message.message}</p>
-                        )}
-                        <p
-                          className={`text-xs mt-1 ${
-                            (message.senderId?.id || message.senderId) ===
-                            user?.id
-                              ? "text-blue-100"
-                              : "text-gray-500"
+
+                        <div
+                          className={`flex ${
+                            message.senderid === user?.id
+                              ? "justify-end"
+                              : "justify-start"
                           }`}
                         >
-                          {formatTime(message.timestamp)}
-                        </p>
+                          <div
+                            className={`flex items-start space-x-2 max-w-xs lg:max-w-md ${
+                              message.senderid === user?.id
+                                ? "flex-row-reverse space-x-reverse"
+                                : ""
+                            }`}
+                          >
+                            <Avatar className="w-8 h-8">
+                              <AvatarFallback>
+                                {message.senderid === user?.id ? (
+                                  <User className="h-4 w-4" />
+                                ) : (
+                                  message.sender?.username
+                                    ?.charAt(0)
+                                    .toUpperCase() || "D"
+                                )}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div
+                              className={`rounded-lg px-4 py-2 ${
+                                message.senderid ===
+                                user?.id
+                                  ? "bg-blue-600 text-white"
+                                  : "bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white"
+                              }`}
+                            >
+                              {renderMessageContent(message)}
+                              <p
+                                className={`text-xs mt-1 ${
+                                  message.senderid ===
+                                  user?.id
+                                    ? "text-blue-100"
+                                    : "text-gray-500 dark:text-gray-400"
+                                }`}
+                              >
+                                {formatTime(message.timestamp)}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                ))}
-
-                {isSending && (
-                  <div className="flex justify-end">
-                    <div className="flex items-center space-x-2 text-gray-500">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span className="text-sm">Sending...</span>
-                    </div>
-                  </div>
+                    );
+                  })
                 )}
+                <div ref={messagesEndRef} />
               </CardContent>
 
               {/* Message Input */}
               <div className="border-t p-4 space-y-3">
-                {selectedFile && (
-                  <div className="flex items-center justify-between bg-blue-50 dark:bg-blue-900/20 px-3 py-2 rounded-lg">
-                    <span className="text-sm text-gray-700 dark:text-gray-300 truncate">
-                      {selectedFile.name}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedFile(null)}
-                      className="text-red-500 hover:text-red-700"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                )}
                 <form onSubmit={sendMessage} className="flex space-x-2">
                   <Input
                     type="text"
                     placeholder="Type your message..."
                     value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
+                    onChange={(e) => {
+                      setNewMessage(e.target.value);
+                      handleUserTyping();
+                    }}
                     className="flex-1"
                     disabled={isSending}
+                    ref={inputRef}
                   />
-                  <label className="cursor-pointer">
-                    <input
-                      type="file"
-                      accept="image/*,video/*,.pdf,audio/*,.doc,.docx,.xls,.xlsx"
-                      onChange={(e) =>
-                        setSelectedFile(e.target.files?.[0] || null)
-                      }
-                      className="hidden"
-                      disabled={isSending}
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={isSending}
-                      className="cursor-pointer"
-                      onClick={() =>
-                        (
-                          document.querySelector(
-                            'input[type="file"]'
-                          ) as HTMLInputElement | null
-                        )?.click()
-                      }
-                    >
-                      <Paperclip className="h-4 w-4" />
-                    </Button>
-                  </label>
                   <Button
                     type="submit"
-                    disabled={
-                      (!newMessage.trim() && !selectedFile) || isSending
-                    }
+                    disabled={!newMessage.trim() || isSending}
                     className="bg-blue-600 hover:bg-blue-700"
                   >
-                    <Send className="h-4 w-4" />
+                    {isSending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
                   </Button>
                 </form>
               </div>
             </Card>
           </div>
         </div>
-
-        {/* Chat Notice */}
       </div>
     </div>
   );

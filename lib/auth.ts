@@ -19,7 +19,8 @@ export const generateToken = (userId: string, role: string): string => {
 export const verifyToken = (token: string): any => {
   try {
     return jwt.verify(token, JWT_SECRET);
-  } catch (error) {
+  } catch (error: any) {
+    console.error('JWT Verification Error:', error.message);
     return null;
   }
 };
