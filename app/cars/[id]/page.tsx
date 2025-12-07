@@ -312,13 +312,13 @@ export default function CarDetailsPage() {
           {/* Car Details */}
           <div className="space-y-6">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
                 {car.title}
               </h1>
-              <p className="text-xl text-gray-600">
+              <p className="text-xl text-gray-600 dark:text-gray-300">
                 {car.year} {car.brand} {car.model}
               </p>
-              <div className="text-3xl font-bold text-blue-600 mt-4">
+              <div className="text-3xl font-bold text-blue-600 dark:text-blue-400 mt-4">
                 {formatPrice(car.price)}
               </div>
             </div>
@@ -388,22 +388,24 @@ export default function CarDetailsPage() {
                   </Button>
                 </Link>
               )}
-              <Button
-                variant="outline"
-                onClick={toggleFavorite}
-                className={
-                  favorites.includes(car.id)
-                    ? "text-red-600 border-red-600"
-                    : ""
-                }
-              >
-                <Heart
-                  className={`h-4 w-4 ${
-                    favorites.includes(car.id) ? "fill-current" : ""
-                  }`}
-                />
-              </Button>
-              {user && user.id !== car.adminid?.id && (
+              {user && user.id !== car.adminid && (
+                <Button
+                  variant="outline"
+                  onClick={toggleFavorite}
+                  className={
+                    favorites.includes(car.id)
+                      ? "text-red-600 border-red-600"
+                      : ""
+                  }
+                >
+                  <Heart
+                    className={`h-4 w-4 ${
+                      favorites.includes(car.id) ? "fill-current" : ""
+                    }`}
+                  />
+                </Button>
+              )}
+              {user && user.id !== car.adminid && (
                 <Button
                   onClick={() => setIsBookingDialogOpen(true)}
                   className="bg-green-600 hover:bg-green-700"

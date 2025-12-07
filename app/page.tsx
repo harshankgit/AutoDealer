@@ -12,6 +12,7 @@ import MonthlyVisitorsChart from '@/components/charts/MonthlyVisitorsChart';
 import LineChart from '@/components/charts/LineChart';
 import PieChart from '@/components/charts/PieChart';
 import dynamic from 'next/dynamic';
+import { LoadingLink } from '@/components/ui/LoadingLink';
 
 interface HomePageStats {
   totalUsers: number;
@@ -189,32 +190,32 @@ export default function Home() {
             <div className="flex flex-col sm:flex-row gap-4 justify-center w-full max-w-md mx-auto">
               {user ? (
                 <>
-                  <Link href="/rooms" className="w-full sm:w-auto">
+                  <LoadingLink href="/rooms" className="w-full sm:w-auto">
                     <Button size="lg" className="w-full bg-primary text-primary-foreground hover:opacity-95">Browse Showrooms</Button>
-                  </Link>
+                  </LoadingLink>
                   {user.role === 'admin' && (
                     <>
-                      <Link href="/dashboard" className="w-full sm:w-auto">
+                      <LoadingLink href="/dashboard" className="w-full sm:w-auto">
                         <Button size="lg" variant="outline" className="w-full">
-                          Dashboard
+                          Chat System
                         </Button>
-                      </Link>
-                      <Link href="/admin" className="w-full sm:w-auto">
+                      </LoadingLink>
+                      <LoadingLink href="/admin" className="w-full sm:w-auto">
                         <Button size="lg" variant="outline" className="w-full">
                           Manage Your Showroom
                         </Button>
-                      </Link>
+                      </LoadingLink>
                     </>
                   )}
                 </>
               ) : (
                 <>
-                  <Link href="/register" className="w-full sm:w-auto">
+                  <LoadingLink href="/register" className="w-full sm:w-auto">
                     <Button size="lg" className="w-full bg-primary text-primary-foreground hover:opacity-95">Get Started</Button>
-                  </Link>
-                  <Link href="/login" className="w-full sm:w-auto">
+                  </LoadingLink>
+                  <LoadingLink href="/login" className="w-full sm:w-auto">
                     <Button size="lg" variant="outline">Sign In</Button>
-                  </Link>
+                  </LoadingLink>
                 </>
               )}
             </div>
@@ -554,11 +555,11 @@ export default function Home() {
           <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">Ready to Find Your Next Car?</h2>
           <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">Join thousands of satisfied customers who found their perfect car through AutoDealer.</p>
           <div className="w-full max-w-xs mx-auto">
-            <Link href={user ? '/rooms' : '/register'}>
+            <LoadingLink href={user ? '/rooms' : '/register'}>
               <Button size="lg" className="w-full bg-white text-blue-600 hover:bg-gray-100 dark:bg-gray-100 dark:text-blue-700 dark:hover:bg-gray-200">
                 {user ? 'Browse Cars Now' : 'Start Your Journey'}
               </Button>
-            </Link>
+            </LoadingLink>
           </div>
         </div>
       </div>
@@ -582,8 +583,8 @@ export default function Home() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col items-center text-center sm:text-left sm:items-start gap-4 sm:flex-row sm:items-center sm:justify-between text-sm text-muted-foreground">
             <div>© {new Date().getFullYear()} CarSelling — Built by Harshank Kanungo</div>
             <div className="flex items-center gap-4">
-              <Link href="/contact" className="hover:underline">Contact</Link>
-              <Link href="/rooms" className="hover:underline">Showrooms</Link>
+              <LoadingLink href="/contact" className="hover:underline">Contact</LoadingLink>
+              <LoadingLink href="/rooms" className="hover:underline">Showrooms</LoadingLink>
             </div>
           </div>
         </footer>

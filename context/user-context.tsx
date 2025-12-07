@@ -8,6 +8,11 @@ interface User {
   email: string;
   role: string;
   token: string;
+  phone?: string;
+  location?: string;
+  profile_image?: string;
+  created_at?: string;
+  last_login?: string;
 }
 
 interface UserContextType {
@@ -15,6 +20,7 @@ interface UserContextType {
   loading: boolean;
   login: (userData: User) => void;
   logout: () => void;
+  updateUser?: (userData: Partial<User>) => void;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -66,8 +72,16 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     localStorage.removeItem('token');
   };
 
+  const updateUser = (userData: Partial<User>) => {
+    if (user) {
+      const updatedUser = { ...user, ...userData };
+      setUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+    }
+  };
+
   return (
-    <UserContext.Provider value={{ user, loading, login, logout }}>
+    <UserContext.Provider value={{ user, loading, login, logout, updateUser }}>
       {children}
     </UserContext.Provider>
   );

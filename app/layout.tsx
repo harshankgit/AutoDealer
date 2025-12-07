@@ -5,9 +5,12 @@ import { ThemeProvider } from '@/components/theme-provider';
 import Navbar from '@/components/layout/Navbar';
 import { Toaster } from '@/components/ui/toaster';
 import { UserProvider } from '../context/user-context';
+import { LoadingProvider } from '../context/loading-context';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import ServiceWorkerRegistration from '@/components/pwa/ServiceWorkerRegistration';
 import RealTimeNotifications from '@/components/realtime/RealTimeNotifications';
 import VisitTracker from '@/components/VisitTracker';
+import GlobalSpinner from '@/components/layout/GlobalSpinner';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -40,14 +43,20 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <UserProvider>
-            <ServiceWorkerRegistration />
-            <RealTimeNotifications />
-            <VisitTracker />
-            <Navbar />
-            <main>{children}</main>
-            <Toaster />
-          </UserProvider>
+          <LoadingProvider>
+            <UserProvider>
+              <ServiceWorkerRegistration />
+              <RealTimeNotifications />
+              <VisitTracker />
+              <Navbar />
+              <div className="fixed top-16 left-0 right-0 z-50">
+                <GlobalSpinner />
+                <LoadingSpinner />
+              </div>
+              <main className="pt-1">{children}</main>
+              <Toaster />
+            </UserProvider>
+          </LoadingProvider>
         </ThemeProvider>
       </body>
     </html>

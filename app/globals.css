@@ -70,17 +70,39 @@
   .dark ::-webkit-scrollbar {
     width: 8px;
   }
-  
+
   .dark ::-webkit-scrollbar-track {
     background: #374151;
   }
-  
+
   .dark ::-webkit-scrollbar-thumb {
     background: #6b7280;
     border-radius: 4px;
   }
-  
+
   .dark ::-webkit-scrollbar-thumb:hover {
     background: #9ca3af;
   }
+}
+
+/* Custom loading bar animation */
+@keyframes loading-bar {
+  0% {
+    transform: translateX(-100%);
+    width: 30%;
+  }
+  50% {
+    width: 30%;
+  }
+  70% {
+    width: 70%;
+  }
+  100% {
+    transform: translateX(100vw);
+    width: 70%;
+  }
+}
+
+.loading-bar-animation {
+  animation: loading-bar 2s ease-in-out infinite;
 }

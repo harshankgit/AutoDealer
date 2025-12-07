@@ -5,9 +5,10 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/theme-toggle';
-import { Car, LogOut, User, Menu, X, MessageCircle, Bell, HelpCircle } from 'lucide-react';
+import { Car, LogOut, User, Menu, X, MessageCircle, Bell, HelpCircle, Home, Settings, Shield, Heart } from 'lucide-react';
 import { useUser } from '@/context/user-context'; // Corrected import path
 import NotificationBadge from '@/components/realtime/NotificationBadge';
+import ProfileDropdown from '@/components/user/ProfileDropdown';
 
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -31,43 +32,51 @@ export default function Navbar() {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-6">
-            <Link href="/rooms" className="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium">
-              Browse Rooms
+            <Link href="/rooms" className="flex items-center text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium">
+              <Home className="h-4 w-4 mr-1" />
+              <span>Browse Rooms</span>
             </Link>
-            
-            {user ? (
-              <div className="flex items-center space-x-4">
-                {user.role === 'admin' && (
-                  <>
-                    <Link href="/dashboard" className="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium">
-                      Chat System
-                    </Link>
-                    <Link href="/admin" className="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium">
-                      Admin Panel
-                    </Link>
-                  </>
-                )}
-                {user.role === 'superadmin' && (
-                  <>
-                    <Link href="/dashboard" className="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium">
-                      Chat System
-                    </Link>
-                    <Link href="/admin/superadmin" className="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium">
-                      Super Admin
-                    </Link>
-                  </>
-                )}
-                {user.role === 'user' && (
-                  <Link href="/favorites" className="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium">
-                    Favorites
-                  </Link>
-                )}
 
+            {user ? (
+              <div className="flex items-center space-x-6">
                 <div className="flex items-center space-x-4">
+                  {user.role === 'admin' && (
+                    <>
+                      <Link href="/dashboard" className="flex items-center text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium">
+                        <MessageCircle className="h-4 w-4 mr-1" />
+                        <span>Chat System</span>
+                      </Link>
+                      <Link href="/admin" className="flex items-center text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium">
+                        <Settings className="h-4 w-4 mr-1" />
+                        <span>Manage Showroom</span>
+                      </Link>
+                    </>
+                  )}
+                  {user.role === 'superadmin' && (
+                    <>
+                      <Link href="/dashboard" className="flex items-center text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium">
+                        <MessageCircle className="h-4 w-4 mr-1" />
+                        <span>Chat System</span>
+                      </Link>
+                      <Link href="/admin/superadmin" className="flex items-center text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium">
+                        <Shield className="h-4 w-4 mr-1" />
+                        <span>Super Admin</span>
+                      </Link>
+                    </>
+                  )}
+                  {user.role === 'user' && (
+                    <Link href="/favorites" className="flex items-center text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium">
+                      <Heart className="h-4 w-4 mr-1" />
+                      <span>Favorites</span>
+                    </Link>
+                  )}
+                </div>
+
+                <div className="flex items-center space-x-2">
                   {user.role === 'user' && (
                     <>
-                      <Link href="/bookings" className="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium">
-                        <Button variant="ghost" size="sm">
+                      <Link href="/bookings">
+                        <Button variant="ghost" size="sm" className="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400">
                           <Car className="h-5 w-5" />
                         </Button>
                       </Link>
@@ -77,32 +86,31 @@ export default function Navbar() {
                       </Link>
                     </>
                   )}
-                  <div className="flex items-center space-x-2 text-gray-700 dark:text-gray-300">
-                    <User className="h-4 w-4" />
-                    <span className="text-sm">{user.username}</span>
-                  </div>
+                  <ProfileDropdown />
 
                   <ThemeToggle />
 
                   <Link href="/help">
-                    <Button variant="ghost" size="sm">
-                      <HelpCircle className="h-4 w-4 mr-2" />
-                      Help
+                    <Button variant="ghost" size="sm" className="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400">
+                      <HelpCircle className="h-4 w-4" />
                     </Button>
                   </Link>
 
-                  <Button onClick={handleLogout} variant="outline" size="sm">
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Logout
+                  <Button
+                    onClick={handleLogout}
+                    variant="ghost"
+                    size="sm"
+                    className="text-gray-700 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-400"
+                  >
+                    <LogOut className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
             ) : (
-              <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-2">
                 <Link href="/help">
-                  <Button variant="ghost" size="sm">
-                    <HelpCircle className="h-4 w-4 mr-2" />
-                    Help
+                  <Button variant="ghost" size="sm" className="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400">
+                    <HelpCircle className="h-4 w-4" />
                   </Button>
                 </Link>
                 <ThemeToggle />
@@ -134,29 +142,32 @@ export default function Navbar() {
             <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
               <Link
                 href="/rooms"
-                className="block px-3 py-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium"
+                className="flex items-center px-3 py-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium"
                 onClick={() => setIsMenuOpen(false)}
               >
-                Browse Rooms
+                <Home className="h-4 w-4 mr-2" />
+                <span>Browse Rooms</span>
               </Link>
-              
+
               {user ? (
                 <>
                   {user.role === 'admin' && (
                     <>
                       <Link
                         href="/dashboard"
-                        className="block px-3 py-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium"
+                        className="flex items-center px-3 py-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium"
                         onClick={() => setIsMenuOpen(false)}
                       >
-                        Dashboard
+                        <MessageCircle className="h-4 w-4 mr-2" />
+                        <span>Chat System</span>
                       </Link>
                       <Link
                         href="/admin"
-                        className="block px-3 py-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium"
+                        className="flex items-center px-3 py-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium"
                         onClick={() => setIsMenuOpen(false)}
                       >
-                        Admin Panel
+                        <Settings className="h-4 w-4 mr-2" />
+                        <span>Manage Your Showroom</span>
                       </Link>
                     </>
                   )}
@@ -164,74 +175,87 @@ export default function Navbar() {
                     <>
                       <Link
                         href="/dashboard"
-                        className="block px-3 py-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium"
+                        className="flex items-center px-3 py-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium"
                         onClick={() => setIsMenuOpen(false)}
                       >
-                        Dashboard
+                        <MessageCircle className="h-4 w-4 mr-2" />
+                        <span>Chat System</span>
                       </Link>
                       <Link
                         href="/admin/superadmin"
-                        className="block px-3 py-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium"
+                        className="flex items-center px-3 py-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium"
                         onClick={() => setIsMenuOpen(false)}
                       >
-                        Super Admin
+                        <Shield className="h-4 w-4 mr-2" />
+                        <span>Super Admin</span>
                       </Link>
                     </>
                   )}
                   {user.role === 'user' && (
                     <Link
                       href="/favorites"
-                      className="block px-3 py-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium"
+                      className="flex items-center px-3 py-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium"
                       onClick={() => setIsMenuOpen(false)}
                     >
-                      Favorites
+                      <Heart className="h-4 w-4 mr-2" />
+                      <span>Favorites</span>
                     </Link>
                   )}
 
                   <Link
                     href="/help"
-                    className="block px-3 py-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium"
+                    className="flex items-center px-3 py-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium"
                     onClick={() => setIsMenuOpen(false)}
                   >
-                    Help & Support
+                    <HelpCircle className="h-4 w-4 mr-2" />
+                    <span>Help & Support</span>
                   </Link>
 
-                  <div className="px-3 py-2 text-sm text-gray-600 dark:text-gray-400">
-                    Welcome, {user.username}
-                  </div>
+                  <Link
+                    href="/profile"
+                    className="flex items-center px-3 py-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    <User className="h-4 w-4 mr-2" />
+                    <span>Profile</span>
+                  </Link>
 
                   <button
                     onClick={() => {
                       handleLogout();
                       setIsMenuOpen(false);
                     }}
-                    className="block w-full text-left px-3 py-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium"
+                    className="flex items-center w-full text-left px-3 py-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium"
                   >
-                    Logout
+                    <LogOut className="h-4 w-4 mr-2" />
+                    <span>Logout</span>
                   </button>
                 </>
               ) : (
                 <>
                   <Link
                     href="/help"
-                    className="block px-3 py-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium"
+                    className="flex items-center px-3 py-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium"
                     onClick={() => setIsMenuOpen(false)}
                   >
-                    Help & Support
+                    <HelpCircle className="h-4 w-4 mr-2" />
+                    <span>Help & Support</span>
                   </Link>
                   <Link
                     href="/login"
-                    className="block px-3 py-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium"
+                    className="flex items-center px-3 py-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium"
                     onClick={() => setIsMenuOpen(false)}
                   >
-                    Login
+                    <User className="h-4 w-4 mr-2" />
+                    <span>Login</span>
                   </Link>
                   <Link
                     href="/register"
-                    className="block px-3 py-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium"
+                    className="flex items-center px-3 py-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium"
                     onClick={() => setIsMenuOpen(false)}
                   >
-                    Register
+                    <User className="h-4 w-4 mr-2" />
+                    <span>Register</span>
                   </Link>
                 </>
               )}

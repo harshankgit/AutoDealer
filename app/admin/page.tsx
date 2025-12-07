@@ -416,13 +416,15 @@ export default function AdminDashboard() {
         ) : (
           /* Dashboard with Room */
           <Tabs defaultValue="overview" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
-              <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
-              <TabsTrigger value="cars" className="text-xs sm:text-sm">Cars</TabsTrigger>
-              <TabsTrigger value="room" className="text-xs sm:text-sm">Showroom</TabsTrigger>
-              <TabsTrigger value="notifications" className="hidden sm:block text-xs sm:text-sm">Notifications</TabsTrigger>
-              <TabsTrigger value="messages" className="hidden sm:block text-xs sm:text-sm">Messages</TabsTrigger>
-            </TabsList>
+            <div className="w-full overflow-x-auto -mx-4 px-4">
+              <TabsList className="flex w-max min-w-full sm:w-full sm:grid sm:grid-cols-5 sm:mx-0 sm:px-0">
+                <TabsTrigger value="overview" className="text-xs sm:text-sm px-3 py-2 min-w-[80px] whitespace-nowrap">Overview</TabsTrigger>
+                <TabsTrigger value="cars" className="text-xs sm:text-sm px-3 py-2 min-w-[80px] whitespace-nowrap">Cars</TabsTrigger>
+                <TabsTrigger value="room" className="text-xs sm:text-sm px-3 py-2 min-w-[80px] whitespace-nowrap">Showroom</TabsTrigger>
+                <TabsTrigger value="notifications" className="text-xs sm:text-sm px-3 py-2 min-w-[80px] whitespace-nowrap">Notifications</TabsTrigger>
+                <TabsTrigger value="messages" className="text-xs sm:text-sm px-3 py-2 min-w-[80px] whitespace-nowrap">Messages</TabsTrigger>
+              </TabsList>
+            </div>
 
             <TabsContent value="overview" className="space-y-6">
               {/* Stats Cards */}
