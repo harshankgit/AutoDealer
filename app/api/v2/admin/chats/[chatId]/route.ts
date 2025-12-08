@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase/client';
+import { createClient } from '@supabase/supabase-js';
 import { verifyToken } from '@/lib/auth';
 import { pusherService } from '@/lib/pusherService';
 import { userServices } from '@/lib/supabase/services/userService';
-import { getSupabaseServiceRole } from '@/lib/supabase/server';
+
+// Initialize Supabase client for server-side operations
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const serviceRoleSupabase = createClient(supabaseUrl, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
 export async function GET(request: Request, { params }: { params: { chatId: string } }) {
   try {
@@ -31,7 +35,10 @@ export async function GET(request: Request, { params }: { params: { chatId: stri
     let roomForRoomIdFormat = null; // Declare room variable at the top level
 
     // First, try to treat it as a direct conversation ID (UUID format)
-    const { data: conversationByDirectId, error: convByIdError } = await supabase
+    // Create service role client to bypass RLS for admin operations
+    const serviceRoleSupabase = createClient(supabaseUrl, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+
+    const { data: conversationByDirectId, error: convByIdError } = await serviceRoleSupabase
       .from('chat_conversations')
       .select('id, roomid, userid')
       .eq('id', params.chatId)
@@ -92,7 +99,7 @@ export async function GET(request: Request, { params }: { params: { chatId: stri
       targetUserId = fullIdString.substring(splitIndex + 1);
 
       // Verify that the admin has access to this room
-      const { data: roomLocal, error: roomError } = await supabase
+      const { data: roomLocal, error: roomError } = await serviceRoleSupabase
         .from('rooms')
         .select('id, adminid')
         .eq('id', roomid)
@@ -120,7 +127,7 @@ export async function GET(request: Request, { params }: { params: { chatId: stri
       let convData = null;
       let convError = null;
 
-      const { data: existingConv, error: existingConvError } = await supabase
+      const { data: existingConv, error: existingConvError } = await serviceRoleSupabase
         .from('chat_conversations')
         .select('id')
         .eq('roomid', roomid)
@@ -129,7 +136,7 @@ export async function GET(request: Request, { params }: { params: { chatId: stri
 
       if (existingConvError && existingConvError.code === 'PGRST116') { // No rows found
         // Conversation doesn't exist, create it
-        const { data: newConversation, error: createError } = await supabase
+        const { data: newConversation, error: createError } = await serviceRoleSupabase
           .from('chat_conversations')
           .insert([{
             roomid: roomid,
@@ -165,7 +172,7 @@ export async function GET(request: Request, { params }: { params: { chatId: stri
     let roomForCheck = null;
     if (conversationByDirectId && !convByIdError) {
       // For direct conversation ID, fetch room data using the roomid from conversation
-      const { data: roomData, error: roomError } = await supabase
+      const { data: roomData, error: roomError } = await serviceRoleSupabase
         .from('rooms')
         .select('id, adminid')
         .eq('id', conversationByDirectId.roomid)
@@ -193,7 +200,7 @@ export async function GET(request: Request, { params }: { params: { chatId: stri
     }
 
     // Get messages for the conversation
-    const { data: messages, error: msgError } = await supabase
+    const { data: messages, error: msgError } = await serviceRoleSupabase
       .from('chat_messages')
       .select(`
         id,
@@ -222,7 +229,7 @@ export async function GET(request: Request, { params }: { params: { chatId: stri
     if (messages && messages.length > 0 && requesterId !== messages[0]?.senderid) { // If not sender reading their own messages
       try {
         // Mark messages as read for this admin
-        const { error: updateError } = await supabase
+        const { error: updateError } = await serviceRoleSupabase
           .from('chat_messages')
           .update({ is_read: true })
           .eq('conversation_id', conversationId)
@@ -238,7 +245,7 @@ export async function GET(request: Request, { params }: { params: { chatId: stri
     }
 
     // Update conversation's unread count to 0
-    await supabase
+    await serviceRoleSupabase
       .from('chat_conversations')
       .update({ unread_count: 0 })
       .eq('id', conversationId);
@@ -280,7 +287,7 @@ export async function POST(request: Request, { params }: { params: { chatId: str
     let targetUserId = null; // Also declare targetUserId
 
     // First, try to treat it as a direct conversation ID
-    const { data: conversationByDirectId, error: convByIdError } = await supabase
+    const { data: conversationByDirectId, error: convByIdError } = await serviceRoleSupabase
       .from('chat_conversations')
       .select('id, roomid')
       .eq('id', params.chatId)
@@ -338,7 +345,7 @@ export async function POST(request: Request, { params }: { params: { chatId: str
       let convData = null;
       let convError = null;
 
-      const { data: existingConv, error: existingConvError } = await supabase
+      const { data: existingConv, error: existingConvError } = await serviceRoleSupabase
         .from('chat_conversations')
         .select('id, roomid')
         .eq('roomid', roomid)
@@ -347,7 +354,7 @@ export async function POST(request: Request, { params }: { params: { chatId: str
 
       if (existingConvError && existingConvError.code === 'PGRST116') { // No rows found
         // Conversation doesn't exist, create it
-        const { data: newConversation, error: createError } = await supabase
+        const { data: newConversation, error: createError } = await serviceRoleSupabase
           .from('chat_conversations')
           .insert([{
             roomid: roomid,
@@ -388,7 +395,7 @@ export async function POST(request: Request, { params }: { params: { chatId: str
     }
 
     // Verify that the admin has access to this room
-    const { data: room, error: roomError } = await supabase
+    const { data: room, error: roomError } = await serviceRoleSupabase
       .from('rooms')
       .select('id, adminid')
       .eq('id', roomidForPost)
@@ -411,7 +418,7 @@ export async function POST(request: Request, { params }: { params: { chatId: str
     }
 
     // Create the message
-    const { data: newMessage, error: msgError } = await supabase
+    const { data: newMessage, error: msgError } = await serviceRoleSupabase
       .from('chat_messages')
       .insert({
         conversation_id: actualConversationId,
@@ -428,13 +435,13 @@ export async function POST(request: Request, { params }: { params: { chatId: str
     }
 
     // Update conversation's last message time
-    await supabase
+    await serviceRoleSupabase
       .from('chat_conversations')
       .update({ last_message_at: new Date().toISOString() })
       .eq('id', actualConversationId);
 
     // Get the conversation to get the target user ID for notifications
-    const { data: conversationForNotification, error: convNotifError } = await supabase
+    const { data: conversationForNotification, error: convNotifError } = await serviceRoleSupabase
       .from('chat_conversations')
       .select('userid')
       .eq('id', actualConversationId)
