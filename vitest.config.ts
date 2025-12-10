@@ -6,6 +6,6 @@ export default defineConfig({
     globals: true,
     setupFiles: './test/setupTests.ts',
     threads: false,
-    include: ['components/**/*.test.{ts,tsx,js,jsx}'],
+    include: ['components/**/*.test.{ts,tsx,js,jsx}', 'test/**/*.test.{ts,tsx,js,jsx}'],
   },
 });

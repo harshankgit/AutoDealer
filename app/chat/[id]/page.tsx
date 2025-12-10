@@ -1,6 +1,13 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+
+// Extend the Window interface to include our custom property
+declare global {
+  interface Window {
+    chatChannels?: Record<string, any>;
+  }
+}
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -26,6 +33,7 @@ import {
   DollarSign
 } from "lucide-react";
 import { usePusher } from "@/hooks/usePusher";
+import { supabase } from "@/lib/supabase";
 
 interface Car {
   id: string;
@@ -60,6 +68,7 @@ interface Message {
   file_name?: string;
   file_type?: string;
   is_read: boolean;
+  status: 'sent' | 'delivered' | 'seen';
   timestamp: string;
   created_at: string;
   sender: {
@@ -96,6 +105,7 @@ export default function NewChatPage() {
 
   const [car, setCar] = useState<Car | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [messagesLoadedFromApi, setMessagesLoadedFromApi] = useState(false); // Track if messages are loaded from API
   const [newMessage, setNewMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
@@ -112,6 +122,7 @@ export default function NewChatPage() {
   const pusherService = usePusher();
 
   useEffect(() => {
+    console.log('Initializing chat with carId:', carId); // Debug log
     if (!carId) return;
     const userData = localStorage.getItem("user");
     const token = localStorage.getItem("token");
@@ -124,8 +135,16 @@ export default function NewChatPage() {
     initializeChat(token);
 
     return () => {
+      console.log('Cleaning up chat subscription:', conversationId); // Debug log
       if (conversationId && pusherService) {
         pusherService.unsubscribeFromChannel(`chat-${conversationId}`);
+      }
+
+      // Clean up Supabase Realtime channel
+      if (conversationId && window.chatChannels && window.chatChannels[conversationId]) {
+        console.log('Removing Supabase channel:', conversationId); // Debug log
+        supabase.removeChannel(window.chatChannels[conversationId]);
+        delete window.chatChannels[conversationId];
       }
 
       // Clear typing timer on unmount
@@ -177,7 +196,103 @@ export default function NewChatPage() {
 
           // Subscribe to real-time events
           if (convData.conversationId) {
-            subscribeToChatEvents(convData.conversationId);
+            console.log('Setting up real-time subscriptions for conversation:', convData.conversationId); // Debug log
+
+            // Subscribe to typing status via local function
+            subscribeToChatEvents(convData.conversationId, {
+              onTypingStatus: (data: any) => {
+                // Handle typing status for others, not self
+                if (data.userId !== user?.id) {
+                  if (data.isTyping) {
+                    setAdminIsTyping(true);
+                  } else {
+                    setAdminIsTyping(false);
+                  }
+                }
+
+              }
+            });
+
+            // Directly subscribe to additional Pusher events using the service
+            if (pusherService) {
+
+              // Subscribe to new messages - update optimistically for better UX
+              pusherService.subscribeToChannel(`chat-${convData.conversationId}`, 'new-message', (data: any) => {
+
+                // Check if this is a status update rather than a new message
+                if (data.type === 'message-delivered') {
+                  // Update message status optimistically
+                  setMessages(prev => prev.map(msg => {
+                    if (msg.id === data.messageId) {
+                      return { ...msg, status: 'delivered' };
+                    }
+                    return msg;
+                  }));
+                  return;
+                } else if (data.type === 'message-seen') {
+                  // Update message status optimistically
+                  setMessages(prev => prev.map(msg => {
+                    if (msg.id === data.messageId) {
+                      return { ...msg, status: 'seen' };
+                    }
+                    return msg;
+                  }));
+                  return;
+                }
+
+                // For new messages, add them optimistically to the UI
+                // Create a properly structured Message object from the Pusher data
+                const newMsg: Message = {
+                  id: data.message?.id,
+                  conversation_id: data.message?.conversation_id,
+                  senderid: data.message?.senderid,
+                  message: data.message?.message,
+                  message_type: data.message?.message_type || 'text',
+                  car_details: data.message?.car_details,
+                  file_url: data.message?.file_url,
+                  file_name: data.message?.file_name,
+                  file_type: data.message?.file_type,
+                  is_read: data.message?.is_read || false,
+                  status: data.message?.status || 'sent', // Default to 'sent' if not provided
+                  timestamp: data.message?.timestamp || data.timestamp,
+                  created_at: data.message?.created_at || data.timestamp,
+                  sender: data.sender || { username: 'Unknown', role: 'user' }
+                };
+
+                setMessages(prev => {
+                  // Only add if it doesn't exist to prevent duplicates
+                  const exists = prev.some(msg => msg.id === newMsg.id);
+                  if (!exists) {
+                    return [...prev, newMsg];
+                  }
+                  return prev; // Message already exists, return as is
+                });
+              });
+
+              // Subscribe to message delivered status - update optimistically
+              pusherService.subscribeToChannel(`chat-${convData.conversationId}`, 'message-delivered', (data: any) => {
+                console.log('Message delivered status received:', data);
+                setMessages(prev => prev.map(msg => {
+                  if (msg.id === data.messageId) {
+                    return { ...msg, status: 'delivered' };
+                  }
+                  return msg;
+                }));
+              });
+
+              // Subscribe to message seen status - update optimistically
+              pusherService.subscribeToChannel(`chat-${convData.conversationId}`, 'message-seen', (data: any) => {
+                console.log('Message seen status received:', data);
+                setMessages(prev => prev.map(msg => {
+                  if (msg.id === data.messageId) {
+                    return { ...msg, status: 'seen' };
+                  }
+                  return msg;
+                }));
+              });
+            } else {
+              console.error('Pusher service not initialized properly'); // Debug log
+            }
           }
 
           // Load messages for this conversation
@@ -206,67 +321,71 @@ export default function NewChatPage() {
     }
   };
 
-  const subscribeToChatEvents = (conversationId: string) => {
-    // Subscribe to real-time message events
-    if (pusherService) {
-      pusherService.subscribeToChannel(`chat-${conversationId}`, 'new-message', (data: any) => {
-        console.log('Received new message via Pusher:', data); // Debug log
-        setMessages(prev => {
-          // Avoid duplicate messages - check if message exists or if it's the optimistic message we sent
-          const existingMsgIndex = prev.findIndex(msg => msg.id === data.message.id);
+  const subscribeToChatEvents = (conversationId: string, callbacks: {
+    onNewMessage?: (data: any) => void;
+    onTypingStatus?: (data: any) => void;
+  }) => {
+    console.log(`Subscribing to Supabase Realtime chat: ${conversationId}`); // Debug log
 
-          if (existingMsgIndex !== -1) {
-            // If it's an optimistic message we sent, update it with server data
-            const existingMsg = prev[existingMsgIndex];
-            if (existingMsg.id.startsWith('temp-')) {
-              // Update the optimistic message with server data
-              const updatedMessages = [...prev];
-              updatedMessages[existingMsgIndex] = {
-                ...data.message,
-                sender: data.message.sender || data.sender || { username: 'Unknown', role: 'user' }
-              };
-              return updatedMessages;
+    // Subscribe to Supabase Realtime message events for direct database updates - refresh from API
+    const supabaseChannel = supabase
+      .channel(`chat-room-${conversationId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'chat_messages',
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        async (payload) => {
+          console.log('User received new message via Supabase Realtime:', payload.new);
+
+          // Create a properly structured Message object from the payload
+          const newMsg: Message = {
+            id: payload.new.id,
+            conversation_id: payload.new.conversation_id,
+            senderid: payload.new.senderid,
+            message: payload.new.message,
+            message_type: payload.new.message_type || 'text',
+            car_details: payload.new.car_details,
+            file_url: payload.new.file_url,
+            file_name: payload.new.file_name,
+            file_type: payload.new.file_type,
+            is_read: payload.new.is_read,
+            status: (payload.new.status as 'sent' | 'delivered' | 'seen') || 'sent',
+            timestamp: payload.new.timestamp,
+            created_at: payload.new.created_at,
+            sender: payload.new.sender || { username: 'Unknown', role: 'user' }
+          };
+
+          setMessages(prev => {
+            // Only add if it doesn't exist to prevent duplicates
+            const exists = prev.some(msg => msg.id === newMsg.id);
+            if (!exists) {
+              console.log('Adding new message from Supabase Realtime:', newMsg); // Debug log
+              return [...prev, newMsg];
             }
-            // If it's not a temp message and already exists, return as is to avoid duplicates
-            return prev;
-          } else {
-            // Check if the message is already in the list by content/timestamp to prevent duplicates
-            // This handles cases where a message might have been added via fetchMessages before this Pusher event
-            const duplicateByContent = prev.some(msg =>
-              msg.message === data.message.message &&
-              msg.timestamp === data.message.timestamp &&
-              msg.senderid === data.message.senderid
-            );
-
-            if (duplicateByContent) {
-              return prev;
-            }
-
-            // If message doesn't exist, add it (this is for messages from other participants)
-            // Ensure the message structure is consistent with what the frontend expects
-            const formattedMessage = {
-              ...data.message,
-              sender: data.message.sender || data.sender || { username: 'Unknown', role: 'user' }
-            };
-            return [...prev, formattedMessage];
-          }
-        });
-      });
-    }
-
-    // Subscribe to typing events
-    if (pusherService) {
-      pusherService.subscribeToChannel(`chat-${conversationId}`, 'typing-status', (data: any) => {
-        console.log('Received typing status via Pusher:', data); // Debug log
-        if (data.userId !== user?.id) { // Show typing status for others, not self
-          if (data.isTyping) {
-            setAdminIsTyping(true);
-          } else {
-            setAdminIsTyping(false);
-          }
+            return prev; // Message already exists, return as is
+          });
         }
-      });
+      )
+      .subscribe();
+
+    console.log('Supabase channel subscribed:', supabaseChannel); // Debug log
+
+    // Subscribe to Pusher events using the service
+    if (pusherService) {
+      pusherService.subscribeToChatEvents(conversationId, callbacks);
+    } else {
+      console.error('Pusher service not available in subscribeToChatEvents'); // Debug log
     }
+
+    // Store channel for cleanup
+    if (!window.chatChannels) {
+      window.chatChannels = {};
+    }
+    window.chatChannels[conversationId] = supabaseChannel;
   };
 
   const fetchMessages = async (convId: string, token: string) => {
@@ -283,12 +402,19 @@ export default function NewChatPage() {
         console.log('Fetched messages:', data.messages); // Debug log
 
         // Ensure each message has a proper sender object
-        const formattedMessages = (data.messages || []).map((msg: Message) => ({
+        const formattedMessages = (data.messages || []).map((msg: any) => ({
           ...msg,
+          status: msg.status || 'sent', // Default to 'sent' if not provided by API
           sender: msg.sender || { username: 'Unknown', role: 'user' }
         }));
 
-        setMessages(formattedMessages);
+        // Sort messages by timestamp to ensure proper order
+        const sortedMessages = formattedMessages.sort((a: any, b: any) =>
+          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+        );
+
+        setMessages(sortedMessages);
+        setMessagesLoadedFromApi(true); // Mark that messages were loaded from API
       } else {
         const errorData = await response.json();
         setError(errorData.error || "Failed to fetch messages");
@@ -347,13 +473,19 @@ export default function NewChatPage() {
         setMessages(prev => prev.filter(msg => msg.id !== tempMessageId));
         return;
       }
-      const optimisticMessage = {
+
+      const optimisticMessage: Message = {
         id: tempMessageId,
         conversation_id: conversationId,
         senderid: user.id,
         message: newMessage,
         message_type: 'text',
+        car_details: undefined,
+        file_url: undefined,
+        file_name: undefined,
+        file_type: undefined,
         is_read: false,
+        status: 'sent',
         timestamp: new Date().toISOString(),
         created_at: new Date().toISOString(),
         sender: {
@@ -362,6 +494,7 @@ export default function NewChatPage() {
         }
       };
 
+      console.log('Adding optimistic message:', optimisticMessage); // Debug log
       setMessages(prev => [...prev, optimisticMessage]);
 
       const response = await fetch("/api/v2/chat", {
@@ -389,10 +522,15 @@ export default function NewChatPage() {
 
       if (response.ok) {
         // Update the optimistic message with the actual server response data
+        console.log('Server response for new message:', data.data); // Debug log
         setMessages(prev =>
           prev.map(msg =>
             msg.id === tempMessageId
-              ? { ...data.data, sender: data.data.sender || { username: user.username, role: user.role } }
+              ? {
+                  ...data.data,
+                  status: data.data.status as 'sent' | 'delivered' | 'seen' || 'sent',
+                  sender: data.data.sender || { username: user.username, role: user.role }
+                }
               : msg
           )
         );
@@ -408,6 +546,7 @@ export default function NewChatPage() {
       setError("Network error. Please try again.");
       // Remove the optimistic message if there's a network error
       setMessages(prev => prev.filter(msg => msg.id !== tempMessageId));
+      console.error('Error sending message:', error); // Debug log
     } finally {
       setIsSending(false);
     }
@@ -694,16 +833,25 @@ export default function NewChatPage() {
                               }`}
                             >
                               {renderMessageContent(message)}
-                              <p
-                                className={`text-xs mt-1 ${
-                                  message.senderid ===
-                                  user?.id
-                                    ? "text-blue-100"
-                                    : "text-gray-500 dark:text-gray-400"
-                                }`}
-                              >
-                                {formatTime(message.timestamp)}
-                              </p>
+                              <div className="flex items-center justify-between mt-1">
+                                <p
+                                  className={`text-xs ${
+                                    message.senderid ===
+                                    user?.id
+                                      ? "text-blue-100"
+                                      : "text-gray-500 dark:text-gray-400"
+                                  }`}
+                                >
+                                  {formatTime(message.timestamp)}
+                                </p>
+                                {message.senderid === user?.id && (
+                                  <span className="text-xs ml-1">
+                                    {message.status === 'sent' ? '✓' :
+                                     message.status === 'delivered' ? '✓✓' :
+                                     message.status === 'seen' ? '✓✓✓' : ''}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>

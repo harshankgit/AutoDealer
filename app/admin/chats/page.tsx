@@ -32,6 +32,7 @@ import {
 import { usePusher } from "@/hooks/usePusher";
 import { useUser } from "@/context/user-context";
 import BackButton from "@/components/BackButton";
+import { supabase } from "@/lib/supabase";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -76,6 +77,7 @@ interface Message {
   file_name?: string;
   file_type?: string;
   is_read: boolean;
+  status: 'sent' | 'delivered' | 'seen';
   timestamp: string;
   created_at: string;
   sender: {
@@ -113,34 +115,160 @@ export default function AdminChatPanel() {
     loadChats();
   }, []);
 
+  // Use Supabase Realtime for messages
   useEffect(() => {
-    if (selectedChat && pusherService) {
-      // Subscribe to real-time events for the selected chat
-      pusherService.subscribeToChannel(`chat-${selectedChat.id}`, 'new-message', (data: any) => {
-        if (data.conversationId === selectedChat.id) {
+    if (!selectedChat) return;
+
+    // Subscribe to real-time messages for the selected chat with enhanced error handling
+    const channel = supabase
+      .channel(`chat-room-${selectedChat.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'chat_messages',
+          filter: `conversation_id=eq.${selectedChat.id}`,
+        },
+        (payload) => {
+          console.log('Admin received new message via Supabase Realtime:', payload.new);
+
+          // Check if this is the admin's own message to avoid duplication
+          const isAdminSender = payload.new.senderid === adminUser?.id;
+          if (isAdminSender) {
+            console.log('Admin received own message via Supabase Realtime, skipping to avoid duplication');
+            // Update status of the optimistic message if needed
+            setMessages(prev => prev.map(msg => {
+              if (msg.id === payload.new.id) {
+                return { ...msg, status: payload.new.status || 'sent' };
+              }
+              return msg;
+            }));
+            return;
+          }
+
           setMessages(prev => {
             // Avoid duplicate messages
-            if (!prev.some(msg => msg.id === data.message.id)) {
-              return [...prev, data.message].sort((a, b) =>
+            const existingMessage = prev.some(msg => msg.id === payload.new.id);
+            if (!existingMessage) {
+              // Create a properly structured Message object
+              const newMessage: Message = {
+                id: payload.new.id,
+                conversation_id: payload.new.conversation_id,
+                senderid: payload.new.senderid,
+                message: payload.new.message,
+                message_type: payload.new.message_type || 'text',
+                car_details: payload.new.car_details,
+                file_url: payload.new.file_url,
+                file_name: payload.new.file_name,
+                file_type: payload.new.file_type,
+                is_read: payload.new.is_read,
+                status: payload.new.status || 'sent',
+                timestamp: payload.new.timestamp,
+                created_at: payload.new.created_at,
+                sender: {
+                  username: payload.new.sender?.username || 'User',
+                  role: payload.new.sender?.role || 'user'
+                }
+              };
+              return [...prev, newMessage].sort((a, b) =>
                 new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
               );
             }
             return prev;
           });
         }
-      });
+      )
+      .on('broadcast', { event: '*' }, (payload) => {
+        console.log('Admin received broadcast event via Supabase Realtime:', payload);
+      })
+      .on('presence', { event: 'sync' }, () => {
+        console.log('Admin Supabase channel presence sync');
+      })
+      .subscribe();
 
-      // Subscribe to typing events
-      pusherService.subscribeToChannel(`chat-${selectedChat.id}`, 'typing-status', (data: any) => {
-        if (data.conversationId === selectedChat.id) {
-          if (data.userId !== adminUser?.id) { // Show typing status for users, not self
-            setAdminIsTyping(data.isTyping);
+    console.log('Admin Supabase channel subscribed:', channel); // Debug log
+
+    // Also subscribe to Pusher for new messages and typing indicators using the service
+    if (pusherService) {
+      pusherService.subscribeToChatEvents(selectedChat.id, {
+        onNewMessage: (data: any) => {
+          console.log('Admin received new message via Pusher:', data); // Debug log
+
+          // Check if this is a status update rather than a new message
+          if (data.type === 'message-delivered') {
+            // Update message status
+            setMessages(prev => prev.map(msg => {
+              if (msg.id === data.messageId) {
+                return { ...msg, status: 'delivered' };
+              }
+              return msg;
+            }));
+            return;
           }
+
+          // Create a properly structured Message object from the Pusher data
+          const newMessage: Message = {
+            id: data.message?.id,
+            conversation_id: data.message?.conversation_id,
+            senderid: data.message?.senderid,
+            message: data.message?.message,
+            message_type: data.message?.message_type || 'text',
+            car_details: data.message?.car_details,
+            file_url: data.message?.file_url,
+            file_name: data.message?.file_name,
+            file_type: data.message?.file_type,
+            is_read: data.message?.is_read || false,
+            status: data.message?.status || 'sent', // Default to 'sent' if not provided
+            timestamp: data.message?.timestamp || data.timestamp,
+            created_at: data.message?.created_at || data.timestamp,
+            sender: data.sender || { username: 'Unknown', role: 'user' }
+          };
+
+          setMessages(prev => {
+            // Avoid duplicate messages
+            const existingMessage = prev.some(msg => msg.id === newMessage.id);
+            if (!existingMessage) {
+              return [...prev, newMessage].sort((a, b) =>
+                new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+              );
+            }
+            return prev;
+          });
+        },
+        onTypingStatus: (data: any) => {
+          console.log('Admin received typing status via Pusher:', data); // Debug log
+          console.log('Admin user ID:', adminUser?.id); // Debug log
+          console.log('Typing user ID:', data?.userId); // Debug log
+          if (data.conversationId === selectedChat.id) {
+            if (data.userId !== adminUser?.id) { // Show typing status for users, not self
+              setAdminIsTyping(data.isTyping);
+            } else {
+              console.log('Ignoring typing status from self'); // Debug log
+            }
+          }
+        },
+        onMessageDelivered: (data: any) => {
+          console.log('Message delivered status received:', data);
+          setMessages(prev => prev.map(msg => {
+            if (msg.id === data.messageId) {
+              return { ...msg, status: 'delivered' };
+            }
+            return msg;
+          }));
+        },
+        onMessageSeen: (data: any) => {
+          console.log('Message seen status received:', data);
+          setMessages(prev => prev.map(msg => ({
+            ...msg,
+            status: 'seen'
+          })));
         }
       });
     }
 
     return () => {
+      supabase.removeChannel(channel);
       if (selectedChat && pusherService) {
         pusherService.unsubscribeFromChannel(`chat-${selectedChat.id}`);
       }
@@ -150,14 +278,16 @@ export default function AdminChatPanel() {
         clearTimeout(isTypingTimer);
       }
     };
-  }, [selectedChat, pusherService, adminUser, isTypingTimer]);
+  }, [selectedChat, pusherService, adminUser]);
 
   // Function to handle typing indicator for admin
   const handleAdminTyping = async () => {
-    if (!selectedChat || !adminUser || !pusherService) return;
+    if (!selectedChat || !adminUser) return;
 
     // Send typing indicator via the pusher service
-    await pusherService.sendTypingIndicator(selectedChat.id, true);
+    if (pusherService) {
+      await pusherService.sendTypingIndicator(selectedChat.id, true);
+    }
 
     // Clear any existing timer
     if (isTypingTimer) {
@@ -259,9 +389,13 @@ export default function AdminChatPanel() {
 
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !selectedChat) return;
+    if (!newMessage.trim() || !selectedChat || !adminUser) return;
 
     setIsSending(true);
+    console.log('Admin sending message:', newMessage, 'to conversation:', selectedChat.id); // Debug log
+
+    // Optimistically add the message to UI before API call
+    const tempMessageId = `temp-${Date.now()}`;
 
     try {
       const token = localStorage.getItem("token");
@@ -270,46 +404,94 @@ export default function AdminChatPanel() {
         return;
       }
 
-      // Use the conversation ID directly (not the roomid-userid format)
-      const response = await fetch(`/api/v2/admin/chats/${selectedChat.id}`, {
+      // Create optimistic message
+      const optimisticMessage: Message = {
+        id: tempMessageId,
+        conversation_id: selectedChat.id,
+        senderid: adminUser.id,
+        message: newMessage,
+        message_type: 'text',
+        car_details: undefined,
+        file_url: undefined,
+        file_name: undefined,
+        file_type: undefined,
+        is_read: false,
+        status: 'sent',
+        timestamp: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+        sender: {
+          username: adminUser.username,
+          role: adminUser.role || 'admin',
+        }
+      };
+
+      console.log('Adding optimistic admin message:', optimisticMessage); // Debug log
+      setMessages(prev => [...prev, optimisticMessage]);
+
+      // Use the unified chat API endpoint for better real-time support
+      console.log('Admin attempting to send via main API:', `/api/v2/chat`); // Debug log
+      const response = await fetch(`/api/v2/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
+          conversationId: selectedChat.id,
           message: newMessage,
           message_type: 'text'
         }),
       });
 
+      console.log('Admin main API response status:', response.status); // Debug log
+
       if (response.ok) {
+        console.log('Admin message sent successfully via main API'); // Debug log
         setNewMessage("");
-        // Messages will be updated via real-time events
+        // Message will be updated via real-time events (Supabase Realtime + Pusher)
+        // The optimistic message will be replaced when Supabase Realtime receives the actual message
       } else {
-        console.error("Failed to send message");
-        // Try sending via the new endpoint
-        const response2 = await fetch(`/api/v2/chat`, {
+        console.error("Failed to send message via main API");
+        // Log error details
+        const errorDetails = await response.json().catch(() => ({}));
+        console.error("Main API error details:", errorDetails);
+
+        // Remove the optimistic message if main API fails
+        setMessages(prev => prev.filter(msg => msg.id !== tempMessageId));
+
+        // Fallback to admin-specific endpoint
+        console.log('Admin falling back to admin-specific API:', `/api/v2/admin/chats/${selectedChat.id}`); // Debug log
+        const response2 = await fetch(`/api/v2/admin/chats/${selectedChat.id}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`,
           },
           body: JSON.stringify({
-            conversationId: selectedChat.id,
             message: newMessage,
             message_type: 'text'
           }),
         });
 
+        console.log('Admin fallback API response status:', response2.status); // Debug log
+
         if (response2.ok) {
+          console.log('Admin message sent successfully via fallback API'); // Debug log
           setNewMessage("");
+          // Message will be updated via real-time events
         } else {
           console.error("Failed to send message from both endpoints");
+          // Try to get error details
+          const errorData = await response2.json().catch(() => ({}));
+          console.error("Fallback API error details:", errorData);
+          // Show error to user
+          // Keep optimistic message in case the error is temporary
         }
       }
     } catch (error) {
       console.error("Error sending message:", error);
+      // Remove optimistic message if there's a network error
+      setMessages(prev => prev.filter(msg => msg.id !== tempMessageId));
     } finally {
       setIsSending(false);
     }
@@ -911,15 +1093,24 @@ export default function AdminChatPanel() {
                             }`}
                           >
                             {renderMessageContent(message)}
-                            <p
-                              className={`text-xs mt-1 ${
-                                message.senderid === adminUser?.id
-                                  ? "text-blue-100"
-                                  : "text-gray-500 dark:text-gray-400"
-                              }`}
-                            >
-                              {formatTime(message.timestamp)}
-                            </p>
+                            <div className="flex items-center justify-between mt-1">
+                              <p
+                                className={`text-xs ${
+                                  message.senderid === adminUser?.id
+                                    ? "text-blue-100"
+                                    : "text-gray-500 dark:text-gray-400"
+                                }`}
+                              >
+                                {formatTime(message.timestamp)}
+                              </p>
+                              {message.senderid === adminUser?.id && (
+                                <span className="text-xs ml-1">
+                                  {message.status === 'sent' ? '✓' :
+                                   message.status === 'delivered' ? '✓✓' :
+                                   message.status === 'seen' ? '✓✓✓' : ''}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>

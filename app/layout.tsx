@@ -11,6 +11,8 @@ import ServiceWorkerRegistration from '@/components/pwa/ServiceWorkerRegistratio
 import RealTimeNotifications from '@/components/realtime/RealTimeNotifications';
 import VisitTracker from '@/components/VisitTracker';
 import GlobalSpinner from '@/components/layout/GlobalSpinner';
+import { ChatProvider } from '@/components/ChatProvider';
+import OneSignalProvider from '@/components/OneSignalProvider';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -45,16 +47,19 @@ export default function RootLayout({
         >
           <LoadingProvider>
             <UserProvider>
-              <ServiceWorkerRegistration />
-              <RealTimeNotifications />
-              <VisitTracker />
-              <Navbar />
-              <div className="fixed top-16 left-0 right-0 z-50">
-                <GlobalSpinner />
-                <LoadingSpinner />
-              </div>
-              <main className="pt-1">{children}</main>
-              <Toaster />
+              <ChatProvider>
+                <ServiceWorkerRegistration />
+                <RealTimeNotifications />
+                <VisitTracker />
+                <OneSignalProvider />
+                <Navbar />
+                <div className="fixed top-16 left-0 right-0 z-50">
+                  <GlobalSpinner />
+                  <LoadingSpinner />
+                </div>
+                <main className="pt-1">{children}</main>
+                <Toaster />
+              </ChatProvider>
             </UserProvider>
           </LoadingProvider>
         </ThemeProvider>

@@ -55,17 +55,27 @@ export default function NotificationBadge({ onClick }: NotificationBadgeProps) {
 
       const channel = pusherInstance.subscribe(`notification-${user.id}`);
 
+      // Listen for chat message notifications specifically
+      channel.bind('new-chat-notification', (data: any) => {
+        console.log('Received new chat notification via Pusher:', data);
+        setUnreadCount(prev => prev + 1);
+      });
+
+      // Listen for general notification count updates
       channel.bind('notification-unread-count', (data: { count: number }) => {
+        console.log('Received unread count update:', data.count);
         setUnreadCount(data.count);
       });
 
-      // Also bind to new-notification event for immediate updates
-      channel.bind('new-notification', (data: { count: number }) => {
+      // Listen for any new notifications
+      channel.bind('new-notification', (data: any) => {
+        console.log('Received new notification:', data);
         setUnreadCount(prev => prev + 1);
       });
 
       // Cleanup
       return () => {
+        channel.unbind('new-chat-notification');
         channel.unbind('notification-unread-count');
         channel.unbind('new-notification');
         pusherInstance.unsubscribe(`notification-${user.id}`);

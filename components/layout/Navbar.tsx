@@ -75,14 +75,13 @@ export default function Navbar() {
                 <div className="flex items-center space-x-2">
                   {user.role === 'user' && (
                     <>
-                      <Link href="/bookings">
-                        <Button variant="ghost" size="sm" className="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400">
-                          <Car className="h-5 w-5" />
-                        </Button>
+                      <Link href="/bookings" className="flex items-center text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800">
+                        <Car className="h-4 w-4 mr-1" />
+                        <span>Bookings</span>
                       </Link>
-                      {/* Notification badge for user notifications */}
-                      <Link href="/notifications">
-                        <NotificationBadge />
+                      <Link href="/notifications" className="flex items-center text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800">
+                        <Bell className="h-4 w-4 mr-1" />
+                        <span>Notifications</span>
                       </Link>
                     </>
                   )}
@@ -195,14 +194,32 @@ export default function Navbar() {
                     </>
                   )}
                   {user.role === 'user' && (
-                    <Link
-                      href="/favorites"
-                      className="flex items-center px-3 py-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium"
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      <Heart className="h-4 w-4 mr-2" />
-                      <span>Favorites</span>
-                    </Link>
+                    <>
+                      <Link
+                        href="/favorites"
+                        className="flex items-center px-3 py-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium"
+                        onClick={() => setIsMenuOpen(false)}
+                      >
+                        <Heart className="h-4 w-4 mr-2" />
+                        <span>Favorites</span>
+                      </Link>
+                      <Link
+                        href="/bookings"
+                        className="flex items-center px-3 py-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium"
+                        onClick={() => setIsMenuOpen(false)}
+                      >
+                        <Car className="h-4 w-4 mr-2" />
+                        <span>Bookings</span>
+                      </Link>
+                      <Link
+                        href="/notifications"
+                        className="flex items-center px-3 py-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium"
+                        onClick={() => setIsMenuOpen(false)}
+                      >
+                        <Bell className="h-4 w-4 mr-2" />
+                        <span>Notifications</span>
+                      </Link>
+                    </>
                   )}
 
                   <Link

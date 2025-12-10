@@ -418,13 +418,15 @@ export async function POST(request: Request, { params }: { params: { chatId: str
     }
 
     // Create the message
+    // Using service role key for admin messages to avoid RLS complications
     const { data: newMessage, error: msgError } = await serviceRoleSupabase
       .from('chat_messages')
       .insert({
         conversation_id: actualConversationId,
         senderid: senderId,
         message,
-        message_type
+        message_type,
+        status: 'sent'
       })
       .select()
       .single();
@@ -452,18 +454,126 @@ export async function POST(request: Request, { params }: { params: { chatId: str
 
     // Trigger real-time notification for the user
     try {
-      await pusherService.sendNewMessage(actualConversationId, {
-        message: newMessage,
-        sender: senderInfo,
-        conversationId: actualConversationId,
-        timestamp: new Date().toISOString(),
-      });
+      // Get all participants in the conversation (user and admin) to send notifications
+      const { data: participants, error: participantsError } = await serviceRoleSupabase
+        .from('chat_conversations')
+        .select('userid, room:rooms(adminid)')
+        .eq('id', actualConversationId)
+        .single();
 
-      // Update unread count for the user if we found the conversation
-      if (conversationForNotification && !convNotifError) {
-        await pusherService.sendUnreadCountUpdate(conversationForNotification.userid, {
-          count: 1
-        });
+      if (!participantsError && participants) {
+        const allParticipants = [
+          participants.userid,  // User
+          (participants as any).room?.adminid  // Admin
+        ].filter(id => id && id !== null);
+
+        for (const participantId of allParticipants) {
+          if (participantId && participantId !== senderId) { // Only send to recipients, not sender
+            // Send Pusher notification
+            await pusherService.sendNewMessage(actualConversationId, {
+              message: newMessage,
+              sender: senderInfo,
+              conversationId: actualConversationId,
+              timestamp: new Date().toISOString(),
+            });
+
+            // Trigger message delivered notification to sender
+            await pusherService.sendDeliveryStatus(actualConversationId, {
+              messageId: newMessage.id,
+              conversationId: actualConversationId,
+              timestamp: new Date().toISOString(),
+            });
+
+            // Send OneSignal push notification to recipient
+            try {
+              const notificationResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/onesignal/send`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  message: message || 'New message',
+                  recipientId: participantId,
+                  conversationId: actualConversationId,
+                  senderName: senderInfo?.username || 'Someone'
+                })
+              });
+
+              if (!notificationResponse.ok) {
+                console.error('OneSignal notification failed:', await notificationResponse.text());
+              } else {
+                console.log('OneSignal notification sent successfully to:', participantId);
+              }
+            } catch (onesignalError) {
+              console.error('Error sending OneSignal notification:', onesignalError);
+            }
+
+            // Create in-app notification for the recipient
+            try {
+              const inAppNotificationResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/chat`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`, // Use admin token for internal call
+                },
+                body: JSON.stringify({
+                  conversationId: actualConversationId,
+                  message: message || 'New message',
+                  senderId,
+                  senderName: senderInfo?.username || 'Someone',
+                  roomName: (participants as any).room?.name || 'Chat Room'
+                })
+              });
+
+              if (!inAppNotificationResponse.ok) {
+                console.error('In-app notification failed:', await inAppNotificationResponse.text());
+              } else {
+                console.log('In-app notification created successfully for participants');
+              }
+            } catch (inAppError) {
+              console.error('Error creating in-app notification:', inAppError);
+            }
+
+            // Trigger real-time notification for notification bell
+            try {
+              const realTimeNotificationResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/realtime`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                  eventType: 'new-chat-notification',
+                  data: {
+                    title: `New message from ${senderInfo?.username || 'Admin'}`,
+                    message: message.length > 50 ? message.substring(0, 50) + '...' : message,
+                    type: 'chat',
+                    relatedId: actualConversationId,
+                    senderId,
+                    senderName: senderInfo?.username || 'Someone',
+                    timestamp: new Date().toISOString()
+                  },
+                  targetUserId: participantId // Send to the recipient
+                })
+              });
+
+              if (!realTimeNotificationResponse.ok) {
+                console.error('Real-time notification failed:', await realTimeNotificationResponse.text());
+              } else {
+                console.log('Real-time notification sent to:', participantId);
+              }
+            } catch (realtimeError) {
+              console.error('Error sending real-time notification:', realtimeError);
+            }
+
+            // Update unread count for the recipient
+            if (participantId === participants.userid) { // If user is recipient
+              await pusherService.sendUnreadCountUpdate(participantId, {
+                count: 1
+              });
+            }
+          }
+        }
       }
     } catch (notificationError) {
       console.error('Real-time notification error:', notificationError);

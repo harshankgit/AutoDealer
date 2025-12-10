@@ -43,7 +43,12 @@ export class PusherService {
   }
 
   subscribeToChannel(channelName: string, eventName: string, callback: PusherEventCallback) {
-    if (!this.pusher) return;
+    if (!this.pusher) {
+      console.error('Pusher not initialized');
+      return;
+    }
+
+    console.log(`Subscribing to channel: ${channelName}, event: ${eventName}`); // Debug log
 
     // Get or create channel
     let channel = this.channels.get(channelName);
@@ -62,7 +67,10 @@ export class PusherService {
     }
 
     // Bind event to channel
-    channel.bind(eventName, callback);
+    channel.bind(eventName, (data: any) => {
+      console.log(`Received Pusher event '${eventName}' on channel '${channelName}':`, data); // Debug log
+      callback(data);
+    });
   }
 
   unsubscribeFromChannel(channelName: string) {
@@ -79,6 +87,8 @@ export class PusherService {
   subscribeToChatEvents(conversationId: string, callbacks: {
     onNewMessage?: (data: any) => void;
     onTypingStatus?: (data: any) => void;
+    onMessageDelivered?: (data: any) => void;
+    onMessageSeen?: (data: any) => void;
   }) {
     if (callbacks.onNewMessage) {
       this.subscribeToChannel(`chat-${conversationId}`, 'new-message', callbacks.onNewMessage);
@@ -86,6 +96,14 @@ export class PusherService {
 
     if (callbacks.onTypingStatus) {
       this.subscribeToChannel(`chat-${conversationId}`, 'typing-status', callbacks.onTypingStatus);
+    }
+
+    if (callbacks.onMessageDelivered) {
+      this.subscribeToChannel(`chat-${conversationId}`, 'message-delivered', callbacks.onMessageDelivered);
+    }
+
+    if (callbacks.onMessageSeen) {
+      this.subscribeToChannel(`chat-${conversationId}`, 'message-seen', callbacks.onMessageSeen);
     }
   }
 
@@ -111,11 +129,19 @@ export class PusherService {
         timestamp: new Date().toISOString()
       };
 
+      console.log(`Sending typing indicator: userId=${user.id}, isTyping=${isTyping}, conversationId=${conversationId}`); // Debug log
+
       // Use the pusher client to trigger the event
+      // This is a client event which can only be sent to the same user's channel
+      // For cross-user typing notifications, the server should handle this
       if (this.pusher) {
         const channel = this.pusher.channel(`chat-${conversationId}`);
         if (channel) {
+          // This will only send to the same client, not to other users
           channel.trigger('client-typing-status', typingData);
+          console.log('Client typing event triggered successfully'); // Debug log
+        } else {
+          console.error('Could not find channel for client typing event'); // Debug log
         }
       }
       return true;

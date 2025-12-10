@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase/client';
+import { createClient } from '@supabase/supabase-js';
 import { verifyToken } from '@/lib/auth';
-import { getSupabaseServiceRole } from '@/lib/supabase/server';
+
+// Initialize Supabase client for server-side operations
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 export async function GET(request: Request) {
   try {
@@ -19,12 +22,15 @@ export async function GET(request: Request) {
     const requesterId = decodedToken.userId;
     const requesterRole = decodedToken.role;
 
+    // Create service role client to bypass RLS for admin operations
+    const serviceRoleSupabase = createClient(supabaseUrl, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+
     // For admin view, get all conversations for the admin's room(s)
     let conversationsQuery;
-    
+
     if (requesterRole === 'superadmin') {
       // Super admin can see all conversations
-      conversationsQuery = supabase
+      conversationsQuery = serviceRoleSupabase
         .from('chat_conversations')
         .select(`
           id,
@@ -40,7 +46,7 @@ export async function GET(request: Request) {
         .order('last_message_at', { ascending: false });
     } else if (requesterRole === 'admin') {
       // Regular admin can only see conversations for their rooms
-      const { data: rooms, error: roomsError } = await supabase
+      const { data: rooms, error: roomsError } = await serviceRoleSupabase
         .from('rooms')
         .select('id')
         .eq('adminid', requesterId);
@@ -52,7 +58,7 @@ export async function GET(request: Request) {
 
       if (rooms && rooms.length > 0) {
         const roomIds = rooms.map(room => room.id);
-        conversationsQuery = supabase
+        conversationsQuery = serviceRoleSupabase
           .from('chat_conversations')
           .select(`
             id,
@@ -85,7 +91,7 @@ export async function GET(request: Request) {
     // Fetch the latest message for each conversation to show preview
     const enhancedConversations = await Promise.all(
       conversations.map(async (conv) => {
-        const { data: latestMessage, error: msgError } = await supabase
+        const { data: latestMessage, error: msgError } = await serviceRoleSupabase
           .from('chat_messages')
           .select('message, timestamp, senderid')
           .eq('conversation_id', conv.id)
