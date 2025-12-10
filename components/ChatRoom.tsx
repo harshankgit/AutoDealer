@@ -261,13 +261,11 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ conversationId, currentUserId, curr
       const channel = pusherInstance.subscribe(`notification-${currentUserId}`);
 
       channel.bind('new-chat-notification', (data: any) => {
-        console.log('Received new chat notification:', data);
         // Update badge count or show notification as needed
       });
 
       channel.bind('notification-unread-count', (data: {count: number}) => {
         // Update unread notification count in UI if needed
-        console.log('Unread notification count:', data.count);
       });
 
       // Cleanup

@@ -74,7 +74,25 @@ export default function ProfilePage() {
     }
     fetchBookingStats();
     fetchBookings();
+    fetchUserData();
   }, [user]);
+
+  const fetchUserData = async () => {
+    if (!user) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        router.push('/login');
+        return;
+      }
+
+      // In a real app, you would fetch user details from your API
+      // For now, we're using the user context data which is already dynamic
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+    }
+  };
 
   const fetchBookingStats = async () => {
     if (!user) return;
@@ -203,25 +221,47 @@ export default function ProfilePage() {
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (newPassword !== confirmPassword) {
       toast.error('New passwords do not match');
       return;
     }
-    
+
     if (newPassword.length < 6) {
       toast.error('New password must be at least 6 characters');
       return;
     }
-    
+
     try {
-      // In a real app, change password via API
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      toast.success('Password changed successfully');
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
+      // Call the password update API
+      const token = localStorage.getItem('token');
+      if (!token) {
+        toast.error('Authentication token not found');
+        return;
+      }
+
+      const response = await fetch('/api/auth/update-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          currentPassword,
+          newPassword,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        toast.success('Password changed successfully');
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+      } else {
+        toast.error(data.error || 'Failed to change password');
+      }
     } catch (error) {
       console.error('Error changing password:', error);
       toast.error('Failed to change password');
@@ -677,7 +717,9 @@ export default function ProfilePage() {
                     <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Last Login</h4>
                     <p className="flex items-center mt-1">
                       <Calendar className="h-4 w-4 mr-2 text-gray-500" />
-                      {user.last_login ? new Date(user.last_login).toLocaleDateString() : 'N/A'}
+                      {user.last_login && user.last_login !== 'N/A'
+                        ? new Date(user.last_login as string).toLocaleDateString()
+                        : 'N/A'}
                     </p>
                   </div>
                 </div>

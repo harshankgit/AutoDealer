@@ -122,7 +122,6 @@ export default function NewChatPage() {
   const pusherService = usePusher();
 
   useEffect(() => {
-    console.log('Initializing chat with carId:', carId); // Debug log
     if (!carId) return;
     const userData = localStorage.getItem("user");
     const token = localStorage.getItem("token");
@@ -135,14 +134,12 @@ export default function NewChatPage() {
     initializeChat(token);
 
     return () => {
-      console.log('Cleaning up chat subscription:', conversationId); // Debug log
       if (conversationId && pusherService) {
         pusherService.unsubscribeFromChannel(`chat-${conversationId}`);
       }
 
       // Clean up Supabase Realtime channel
       if (conversationId && window.chatChannels && window.chatChannels[conversationId]) {
-        console.log('Removing Supabase channel:', conversationId); // Debug log
         supabase.removeChannel(window.chatChannels[conversationId]);
         delete window.chatChannels[conversationId];
       }
@@ -196,7 +193,6 @@ export default function NewChatPage() {
 
           // Subscribe to real-time events
           if (convData.conversationId) {
-            console.log('Setting up real-time subscriptions for conversation:', convData.conversationId); // Debug log
 
             // Subscribe to typing status via local function
             subscribeToChatEvents(convData.conversationId, {
@@ -269,29 +265,23 @@ export default function NewChatPage() {
                 });
               });
 
-              // Subscribe to message delivered status - update optimistically
-              pusherService.subscribeToChannel(`chat-${convData.conversationId}`, 'message-delivered', (data: any) => {
-                console.log('Message delivered status received:', data);
-                setMessages(prev => prev.map(msg => {
-                  if (msg.id === data.messageId) {
-                    return { ...msg, status: 'delivered' };
-                  }
-                  return msg;
-                }));
+              // Subscribe to message delivered status - refresh from API to get all updated statuses
+              pusherService.subscribeToChannel(`chat-${convData.conversationId}`, 'message-delivered', async (data: any) => {
+                // Refresh from API to get all updated statuses
+                const token = localStorage.getItem("token");
+                if (token && convData.conversationId) {
+                  await fetchMessages(convData.conversationId, token);
+                }
               });
 
-              // Subscribe to message seen status - update optimistically
-              pusherService.subscribeToChannel(`chat-${convData.conversationId}`, 'message-seen', (data: any) => {
-                console.log('Message seen status received:', data);
-                setMessages(prev => prev.map(msg => {
-                  if (msg.id === data.messageId) {
-                    return { ...msg, status: 'seen' };
-                  }
-                  return msg;
-                }));
+              // Subscribe to message seen status - refresh from API to get all updated statuses
+              pusherService.subscribeToChannel(`chat-${convData.conversationId}`, 'message-seen', async (data: any) => {
+                // Refresh from API to get all updated statuses
+                const token = localStorage.getItem("token");
+                if (token && convData.conversationId) {
+                  await fetchMessages(convData.conversationId, token);
+                }
               });
-            } else {
-              console.error('Pusher service not initialized properly'); // Debug log
             }
           }
 
@@ -303,7 +293,6 @@ export default function NewChatPage() {
           if (convData.newMessage) {
             // The fetchMessages call should have already included this message,
             // so any Pusher event for this message will be deduplicated
-            console.log('Start conversation created message:', convData.newMessage);
           }
         } else {
           const errorData = await startConvResponse.json();
@@ -325,7 +314,6 @@ export default function NewChatPage() {
     onNewMessage?: (data: any) => void;
     onTypingStatus?: (data: any) => void;
   }) => {
-    console.log(`Subscribing to Supabase Realtime chat: ${conversationId}`); // Debug log
 
     // Subscribe to Supabase Realtime message events for direct database updates - refresh from API
     const supabaseChannel = supabase
@@ -339,40 +327,15 @@ export default function NewChatPage() {
           filter: `conversation_id=eq.${conversationId}`,
         },
         async (payload) => {
-          console.log('User received new message via Supabase Realtime:', payload.new);
-
-          // Create a properly structured Message object from the payload
-          const newMsg: Message = {
-            id: payload.new.id,
-            conversation_id: payload.new.conversation_id,
-            senderid: payload.new.senderid,
-            message: payload.new.message,
-            message_type: payload.new.message_type || 'text',
-            car_details: payload.new.car_details,
-            file_url: payload.new.file_url,
-            file_name: payload.new.file_name,
-            file_type: payload.new.file_type,
-            is_read: payload.new.is_read,
-            status: (payload.new.status as 'sent' | 'delivered' | 'seen') || 'sent',
-            timestamp: payload.new.timestamp,
-            created_at: payload.new.created_at,
-            sender: payload.new.sender || { username: 'Unknown', role: 'user' }
-          };
-
-          setMessages(prev => {
-            // Only add if it doesn't exist to prevent duplicates
-            const exists = prev.some(msg => msg.id === newMsg.id);
-            if (!exists) {
-              console.log('Adding new message from Supabase Realtime:', newMsg); // Debug log
-              return [...prev, newMsg];
-            }
-            return prev; // Message already exists, return as is
-          });
+          // Refresh messages from API to get the most up-to-date data with proper formatting
+          const token = localStorage.getItem("token");
+          if (token && conversationId) {
+            await fetchMessages(conversationId, token);
+          }
         }
       )
       .subscribe();
 
-    console.log('Supabase channel subscribed:', supabaseChannel); // Debug log
 
     // Subscribe to Pusher events using the service
     if (pusherService) {
@@ -390,7 +353,6 @@ export default function NewChatPage() {
 
   const fetchMessages = async (convId: string, token: string) => {
     try {
-      console.log('Fetching messages for conversation:', convId); // Debug log
       const response = await fetch(`/api/v2/chat?conversationId=${convId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -399,7 +361,6 @@ export default function NewChatPage() {
 
       if (response.ok) {
         const data = await response.json();
-        console.log('Fetched messages:', data.messages); // Debug log
 
         // Ensure each message has a proper sender object
         const formattedMessages = (data.messages || []).map((msg: any) => ({
@@ -494,7 +455,6 @@ export default function NewChatPage() {
         }
       };
 
-      console.log('Adding optimistic message:', optimisticMessage); // Debug log
       setMessages(prev => [...prev, optimisticMessage]);
 
       const response = await fetch("/api/v2/chat", {
@@ -522,7 +482,6 @@ export default function NewChatPage() {
 
       if (response.ok) {
         // Update the optimistic message with the actual server response data
-        console.log('Server response for new message:', data.data); // Debug log
         setMessages(prev =>
           prev.map(msg =>
             msg.id === tempMessageId

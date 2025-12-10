@@ -59,7 +59,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
           filter: `conversation_id=eq.${conversationId}`,
         },
         (payload) => {
-          console.log(`New message in conversation ${conversationId}:`, payload.new);
           // Here you can trigger notifications or update state as needed
         }
       )
@@ -102,7 +101,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
           filter: `conversation_id=eq.${conversationId}`,
         },
         (payload) => {
-          console.log(`Typing indicator updated in conversation ${conversationId}:`, payload.new);
           setTypingUsers(prev => ({
             ...prev,
             [conversationId]: payload.new.is_typing
@@ -118,7 +116,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
           filter: `conversation_id=eq.${conversationId}`,
         },
         (payload) => {
-          console.log(`Typing indicator updated in conversation ${conversationId}:`, payload.new);
           setTypingUsers(prev => ({
             ...prev,
             [conversationId]: payload.new.is_typing

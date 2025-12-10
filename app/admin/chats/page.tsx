@@ -131,12 +131,10 @@ export default function AdminChatPanel() {
           filter: `conversation_id=eq.${selectedChat.id}`,
         },
         (payload) => {
-          console.log('Admin received new message via Supabase Realtime:', payload.new);
 
           // Check if this is the admin's own message to avoid duplication
           const isAdminSender = payload.new.senderid === adminUser?.id;
           if (isAdminSender) {
-            console.log('Admin received own message via Supabase Realtime, skipping to avoid duplication');
             // Update status of the optimistic message if needed
             setMessages(prev => prev.map(msg => {
               if (msg.id === payload.new.id) {
@@ -180,20 +178,16 @@ export default function AdminChatPanel() {
         }
       )
       .on('broadcast', { event: '*' }, (payload) => {
-        console.log('Admin received broadcast event via Supabase Realtime:', payload);
       })
       .on('presence', { event: 'sync' }, () => {
-        console.log('Admin Supabase channel presence sync');
       })
       .subscribe();
 
-    console.log('Admin Supabase channel subscribed:', channel); // Debug log
 
     // Also subscribe to Pusher for new messages and typing indicators using the service
     if (pusherService) {
       pusherService.subscribeToChatEvents(selectedChat.id, {
         onNewMessage: (data: any) => {
-          console.log('Admin received new message via Pusher:', data); // Debug log
 
           // Check if this is a status update rather than a new message
           if (data.type === 'message-delivered') {
@@ -237,19 +231,14 @@ export default function AdminChatPanel() {
           });
         },
         onTypingStatus: (data: any) => {
-          console.log('Admin received typing status via Pusher:', data); // Debug log
-          console.log('Admin user ID:', adminUser?.id); // Debug log
-          console.log('Typing user ID:', data?.userId); // Debug log
           if (data.conversationId === selectedChat.id) {
             if (data.userId !== adminUser?.id) { // Show typing status for users, not self
               setAdminIsTyping(data.isTyping);
             } else {
-              console.log('Ignoring typing status from self'); // Debug log
             }
           }
         },
         onMessageDelivered: (data: any) => {
-          console.log('Message delivered status received:', data);
           setMessages(prev => prev.map(msg => {
             if (msg.id === data.messageId) {
               return { ...msg, status: 'delivered' };
@@ -258,7 +247,6 @@ export default function AdminChatPanel() {
           }));
         },
         onMessageSeen: (data: any) => {
-          console.log('Message seen status received:', data);
           setMessages(prev => prev.map(msg => ({
             ...msg,
             status: 'seen'
@@ -392,7 +380,6 @@ export default function AdminChatPanel() {
     if (!newMessage.trim() || !selectedChat || !adminUser) return;
 
     setIsSending(true);
-    console.log('Admin sending message:', newMessage, 'to conversation:', selectedChat.id); // Debug log
 
     // Optimistically add the message to UI before API call
     const tempMessageId = `temp-${Date.now()}`;
@@ -425,11 +412,9 @@ export default function AdminChatPanel() {
         }
       };
 
-      console.log('Adding optimistic admin message:', optimisticMessage); // Debug log
       setMessages(prev => [...prev, optimisticMessage]);
 
       // Use the unified chat API endpoint for better real-time support
-      console.log('Admin attempting to send via main API:', `/api/v2/chat`); // Debug log
       const response = await fetch(`/api/v2/chat`, {
         method: 'POST',
         headers: {
@@ -443,10 +428,8 @@ export default function AdminChatPanel() {
         }),
       });
 
-      console.log('Admin main API response status:', response.status); // Debug log
 
       if (response.ok) {
-        console.log('Admin message sent successfully via main API'); // Debug log
         setNewMessage("");
         // Message will be updated via real-time events (Supabase Realtime + Pusher)
         // The optimistic message will be replaced when Supabase Realtime receives the actual message
@@ -460,7 +443,6 @@ export default function AdminChatPanel() {
         setMessages(prev => prev.filter(msg => msg.id !== tempMessageId));
 
         // Fallback to admin-specific endpoint
-        console.log('Admin falling back to admin-specific API:', `/api/v2/admin/chats/${selectedChat.id}`); // Debug log
         const response2 = await fetch(`/api/v2/admin/chats/${selectedChat.id}`, {
           method: 'POST',
           headers: {
@@ -473,10 +455,8 @@ export default function AdminChatPanel() {
           }),
         });
 
-        console.log('Admin fallback API response status:', response2.status); // Debug log
 
         if (response2.ok) {
-          console.log('Admin message sent successfully via fallback API'); // Debug log
           setNewMessage("");
           // Message will be updated via real-time events
         } else {
@@ -587,7 +567,6 @@ export default function AdminChatPanel() {
     }
 
     // In a real app, you would make an API call here
-    console.log('Changing password for user:', adminUser?.id);
     // Reset form and close dialog
     setCurrentPassword('');
     setNewPassword('');
@@ -612,7 +591,6 @@ export default function AdminChatPanel() {
     if (!profileImage) return;
 
     // In a real app, you would upload the image to the server
-    console.log('Uploading image:', profileImage);
     setProfileImage(null);
     // Reset preview after upload simulation
     setTimeout(() => {
