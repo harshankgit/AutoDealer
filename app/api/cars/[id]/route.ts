@@ -57,25 +57,43 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
       return NextResponse.json({ error: 'Forbidden: You can only edit your own cars' }, { status: 403 });
     }
 
-    // Update the car
-    const updatedCar = await carServices.updateCar(id, {
-      title: updatedData.title,
-      brand: updatedData.brand,
-      model: updatedData.model,
-      year: updatedData.year,
-      price: updatedData.price,
-      mileage: updatedData.mileage,
-      fuel_type: updatedData.fuel_type,
-      transmission: updatedData.transmission,
-      ownership_history: updatedData.ownership_history,
-      images: updatedData.images,
-      description: updatedData.description,
-      condition: updatedData.condition,
-      specifications: updatedData.specifications || {},
-    });
+    // Update the car - sanitize and validate input data
+    const updatePayload: any = {};
+
+    // Add fields only if they are provided and valid - handle both camelCase and snake_case from client
+    // Only add non-empty values to avoid database constraint issues
+    if (updatedData.title !== undefined && updatedData.title !== '') updatePayload.title = updatedData.title;
+    if (updatedData.brand !== undefined && updatedData.brand !== '') updatePayload.brand = updatedData.brand;
+    if (updatedData.model !== undefined && updatedData.model !== '') updatePayload.model = updatedData.model;
+    if (updatedData.year !== undefined) updatePayload.year = updatedData.year;
+    if (updatedData.price !== undefined) updatePayload.price = updatedData.price;
+    if (updatedData.mileage !== undefined) updatePayload.mileage = updatedData.mileage;
+    // Handle both camelCase and snake_case field names, only set if non-empty
+    if (updatedData.fuel_type !== undefined && updatedData.fuel_type !== '') updatePayload.fuel_type = updatedData.fuel_type;
+    if (updatedData.fuelType !== undefined && updatedData.fuelType !== '') updatePayload.fuel_type = updatedData.fuelType;
+    if (updatedData.transmission !== undefined && updatedData.transmission !== '') updatePayload.transmission = updatedData.transmission;
+    // Handle both camelCase and snake_case field names, only set if non-empty
+    if (updatedData.ownership_history !== undefined && updatedData.ownership_history !== '') updatePayload.ownership_history = updatedData.ownership_history;
+    if (updatedData.ownershipHistory !== undefined && updatedData.ownershipHistory !== '') updatePayload.ownership_history = updatedData.ownershipHistory;
+    if (updatedData.images !== undefined) updatePayload.images = Array.isArray(updatedData.images) ? updatedData.images : [];
+    if (updatedData.description !== undefined) updatePayload.description = updatedData.description; // Allow empty description
+    if (updatedData.condition !== undefined && updatedData.condition !== '') updatePayload.condition = updatedData.condition;
+    if (updatedData.availability !== undefined && updatedData.availability !== '') updatePayload.availability = updatedData.availability;
+
+    // Handle specifications separately to ensure it's a proper object
+    // Only add specifications if it's a valid object to avoid JSON constraint issues
+    if (typeof updatedData.specifications === 'object' && updatedData.specifications !== null) {
+      updatePayload.specifications = updatedData.specifications;
+    }
+
+    console.log('Attempting to update car with ID:', id);
+    console.log('Update payload:', JSON.stringify(updatePayload, null, 2));
+
+    const updatedCar = await carServices.updateCar(id, updatePayload);
 
     if (!updatedCar) {
-      return NextResponse.json({ error: 'Failed to update car' }, { status: 500 });
+      console.error('Car update failed for ID:', id, 'with data:', updatePayload);
+      return NextResponse.json({ error: 'Failed to update car - data validation or constraint error' }, { status: 500 });
     }
 
     return NextResponse.json(updatedCar, { status: 200 });

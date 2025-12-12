@@ -154,19 +154,61 @@ export const carServices = {
   // Update a car
   async updateCar(carId: string, carData: Partial<Car>): Promise<Car | null> {
     try {
-      const { data, error } = await supabase
+      // Prepare update data by removing undefined values and excluding id
+      const updateData: Partial<Car> = {};
+      Object.keys(carData).forEach(key => {
+        const typedKey = key as keyof Partial<Car>;
+        if (carData[typedKey] !== undefined && key !== 'id') {
+          (updateData as any)[typedKey] = carData[typedKey];
+        }
+      });
+
+      // First, check if the car exists
+      const { data: existingCar, error: checkError } = await supabase
         .from('cars')
-        .update(carData)
+        .select('id')
         .eq('id', carId)
-        .select()
         .single();
 
-      if (error) {
-        console.error('Error updating car:', error);
+      if (checkError) {
+        console.error('Error checking if car exists before update:', checkError);
         return null;
       }
 
-      return data as Car;
+      if (!existingCar) {
+        console.error('Car does not exist before update attempt:', carId);
+        return null;
+      }
+
+      console.log('Attempting to update car with ID:', carId, 'and data:', updateData);
+
+      // First, perform the update operation using service role for higher permissions
+      const { error: updateError, status } = await getSupabaseServiceRole()
+        .from('cars')
+        .update(updateData)
+        .eq('id', carId);
+
+      if (updateError) {
+        console.error('Error during update operation:', updateError);
+        console.error('Car ID:', carId);
+        console.error('Update data:', updateData);
+        return null;
+      }
+
+      // Then fetch the updated record to return using service role
+      const { data: updatedCar, error: fetchError } = await getSupabaseServiceRole()
+        .from('cars')
+        .select('*')
+        .eq('id', carId)
+        .single();
+
+      if (fetchError) {
+        console.error('Error fetching updated car:', fetchError);
+        return null;
+      }
+
+      console.log('Successfully updated car:', updatedCar);
+      return updatedCar as Car;
     } catch (error) {
       console.error('Error in updateCar:', error);
       return null;
