@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { useUser } from '@/context/user-context';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AdminBookingsSkeleton } from '@/components/skeletons/AdminBookingsSkeleton';
 
 interface Booking {
   id: string;
@@ -162,14 +163,7 @@ export default function AdminBookingsPage() {
   };
 
   if (loading || isLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
-          <p className="text-gray-600">Loading bookings...</p>
-        </div>
-      </div>
-    );
+    return <AdminBookingsSkeleton />;
   }
 
   if (error) {

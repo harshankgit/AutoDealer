@@ -24,6 +24,7 @@ import {
 import { useUser } from "@/context/user-context";
 import { usePusher } from "@/hooks/usePusher";
 import Link from "next/link";
+import { ChatDashboardSkeleton } from '@/components/skeletons/ChatDashboardSkeleton';
 
 interface UserChat {
   id: string;
@@ -399,16 +400,7 @@ export default function ChatDashboard() {
   };
 
   if (loading || isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-500" />
-          <p className="text-gray-600 dark:text-gray-300">
-            Loading chat dashboard...
-          </p>
-        </div>
-      </div>
-    );
+    return <ChatDashboardSkeleton />;
   }
 
   if (!user) {

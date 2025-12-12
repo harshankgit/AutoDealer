@@ -12,6 +12,7 @@ import { Separator } from '@/components/ui/separator';
 import { ArrowLeft, Car, Plus, X, Loader2, Upload, Image as ImageIcon, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useUser } from '@/context/user-context';
+import { AddCarSkeleton } from '@/components/skeletons/AddCarSkeleton';
 
 interface CarFormData {
   title: string;
@@ -281,11 +282,7 @@ export default function AddCarPage() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
+    return <AddCarSkeleton />;
   }
 
   if (!user) {

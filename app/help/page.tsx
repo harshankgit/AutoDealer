@@ -163,10 +163,10 @@ export default function HelpPage() {
   // Get the appropriate content based on user role
   const getUserRoleTab = () => {
     if (!user) return "overview";
+    // Only show superadmin content to superadmin users
+    if (user.role === "superadmin") return "superadmin";
     return user.role === "admin"
       ? "admin"
-      : user.role === "superadmin"
-      ? "superadmin"
       : user.role === "user"
       ? "user"
       : "overview";
@@ -188,7 +188,7 @@ export default function HelpPage() {
 
         {/* Role Selection Tabs */}
         <div className="flex flex-wrap justify-center gap-4 mb-8">
-          {(["overview", "user", "admin", "superadmin"] as const).map((tab) => (
+          {(["overview", "user", "admin"] as const).map((tab) => (
             <Button
               key={tab}
               variant={activeTab === tab ? "default" : "outline"}
@@ -208,6 +208,27 @@ export default function HelpPage() {
               <span className="capitalize font-medium">{tab}</span>
             </Button>
           ))}
+          {/* Only show superadmin tab to superadmin users */}
+          {user?.role === 'superadmin' && (
+            <Button
+              key="superadmin"
+              variant={activeTab === "superadmin" ? "default" : "outline"}
+              onClick={() => setActiveTab("superadmin")}
+              className={`
+        flex flex-col items-center justify-center
+        w-[150px] h-[110px]   /* Fixed width & height */
+        rounded-xl transition-all duration-200
+        ${
+          activeTab === "superadmin"
+            ? "bg-blue-600 text-white shadow-lg scale-105"
+            : "bg-white dark:bg-gray-800 text-gray-900 dark:text-white hover:shadow-md"
+        }
+      `}
+            >
+              <div className="mb-2 text-2xl">{roleContents.superadmin.icon}</div>
+              <span className="capitalize font-medium">superadmin</span>
+            </Button>
+          )}
         </div>
 
         {/* Current Role Highlight */}
@@ -314,9 +335,11 @@ export default function HelpPage() {
                   <th className="py-4 px-6 text-center text-gray-900 dark:text-white">
                     Admin
                   </th>
-                  <th className="py-4 px-6 text-center text-gray-900 dark:text-white">
-                    Super Admin
-                  </th>
+                  {user?.role === 'superadmin' && (
+                    <th className="py-4 px-6 text-center text-gray-900 dark:text-white">
+                      Super Admin
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -330,9 +353,11 @@ export default function HelpPage() {
                   <td className="py-4 px-6 text-center text-gray-500 dark:text-gray-400">
                     ✓
                   </td>
-                  <td className="py-4 px-6 text-center text-green-600 dark:text-green-400">
-                    ✓
-                  </td>
+                  {user?.role === 'superadmin' && (
+                    <td className="py-4 px-6 text-center text-green-600 dark:text-green-400">
+                      ✓
+                    </td>
+                  )}
                 </tr>
                 <tr className="border-b border-gray-100 dark:border-gray-700">
                   <td className="py-4 px-6 text-gray-700 dark:text-gray-300">
@@ -344,9 +369,11 @@ export default function HelpPage() {
                   <td className="py-4 px-6 text-center text-gray-500 dark:text-gray-400">
                     -
                   </td>
-                  <td className="py-4 px-6 text-center text-green-600 dark:text-green-400">
-                    ✓
-                  </td>
+                  {user?.role === 'superadmin' && (
+                    <td className="py-4 px-6 text-center text-green-600 dark:text-green-400">
+                      ✓
+                    </td>
+                  )}
                 </tr>
                 <tr className="border-b border-gray-100 dark:border-gray-700">
                   <td className="py-4 px-6 text-gray-700 dark:text-gray-300">
@@ -358,9 +385,11 @@ export default function HelpPage() {
                   <td className="py-4 px-6 text-center text-green-600 dark:text-green-400">
                     ✓
                   </td>
-                  <td className="py-4 px-6 text-center text-green-600 dark:text-green-400">
-                    ✓
-                  </td>
+                  {user?.role === 'superadmin' && (
+                    <td className="py-4 px-6 text-center text-green-600 dark:text-green-400">
+                      ✓
+                    </td>
+                  )}
                 </tr>
                 <tr className="border-b border-gray-100 dark:border-gray-700">
                   <td className="py-4 px-6 text-gray-700 dark:text-gray-300">
@@ -372,9 +401,11 @@ export default function HelpPage() {
                   <td className="py-4 px-6 text-center text-green-600 dark:text-green-400">
                     ✓
                   </td>
-                  <td className="py-4 px-6 text-center text-green-600 dark:text-green-400">
-                    ✓
-                  </td>
+                  {user?.role === 'superadmin' && (
+                    <td className="py-4 px-6 text-center text-green-600 dark:text-green-400">
+                      ✓
+                    </td>
+                  )}
                 </tr>
                 <tr className="border-b border-gray-100 dark:border-gray-700">
                   <td className="py-4 px-6 text-gray-700 dark:text-gray-300">
@@ -386,9 +417,11 @@ export default function HelpPage() {
                   <td className="py-4 px-6 text-center text-green-600 dark:text-green-400">
                     ✓
                   </td>
-                  <td className="py-4 px-6 text-center text-green-600 dark:text-green-400">
-                    ✓
-                  </td>
+                  {user?.role === 'superadmin' && (
+                    <td className="py-4 px-6 text-center text-green-600 dark:text-green-400">
+                      ✓
+                    </td>
+                  )}
                 </tr>
                 <tr className="border-b border-gray-100 dark:border-gray-700">
                   <td className="py-4 px-6 text-gray-700 dark:text-gray-300">
@@ -400,9 +433,11 @@ export default function HelpPage() {
                   <td className="py-4 px-6 text-center text-gray-500 dark:text-gray-400">
                     -
                   </td>
-                  <td className="py-4 px-6 text-center text-green-600 dark:text-green-400">
-                    ✓
-                  </td>
+                  {user?.role === 'superadmin' && (
+                    <td className="py-4 px-6 text-center text-green-600 dark:text-green-400">
+                      ✓
+                    </td>
+                  )}
                 </tr>
               </tbody>
             </table>

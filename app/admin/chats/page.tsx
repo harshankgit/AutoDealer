@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   MessageCircle,
   User,
@@ -50,6 +51,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { AdminChatPanelSkeleton } from '@/components/skeletons/AdminChatPanelSkeleton';
 
 interface UserChat {
   id: string;
@@ -942,8 +944,21 @@ export default function AdminChatPanel() {
             {/* Chat List */}
             <div className="flex-1 overflow-y-auto">
               {isLoading ? (
-                <div className="flex items-center justify-center h-full">
-                  <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                <div className="p-4">
+                  <div className="space-y-2">
+                    {[...Array(5)].map((_, index) => (
+                      <div key={index} className="p-4 flex items-center space-x-3">
+                        <Skeleton className="h-10 w-10 rounded-full" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <Skeleton className="h-4 w-24 mb-1" />
+                            <Skeleton className="h-3 w-12 rounded-full" />
+                          </div>
+                          <Skeleton className="h-3 w-32" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ) : sortedChats.length === 0 ? (
                 <div className="p-8 text-center text-gray-500">

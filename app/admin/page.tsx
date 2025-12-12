@@ -13,6 +13,7 @@ import NotificationBadge, { NotificationItem } from '@/components/ui/notificatio
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import BackButton from '@/components/BackButton';
+import { AdminDashboardSkeleton } from '@/components/skeletons/AdminDashboardSkeleton';
 
 interface Room {
   id: string;
@@ -33,6 +34,11 @@ interface Car {
   price: number;
   availability: string;
   createdAt: string;
+  images?: string[];
+  description?: string;
+  mileage?: number;
+  fuel_type?: string;
+  transmission?: string;
 }
 
 export default function AdminDashboard() {
@@ -350,15 +356,23 @@ export default function AdminDashboard() {
   };
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600 dark:text-blue-400" />
-          <p className="text-gray-600 dark:text-gray-300">Loading dashboard...</p>
-        </div>
-      </div>
-    );
+    return <AdminDashboardSkeleton />;
   }
+
+  // Helper function to safely format date strings or Date objects
+  const formatSafeDate = (dateValue: string | Date) => {
+    if (!dateValue) return 'Date not available';
+
+    try {
+      const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
+      if (isNaN(date.getTime())) {
+        return 'Invalid Date';
+      }
+      return date.toLocaleDateString();
+    } catch (error) {
+      return 'Date not available';
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
@@ -717,51 +731,90 @@ export default function AdminDashboard() {
                   </Link>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {cars.map((car) => (
-                    <Card key={car.id} className="hover:shadow-lg transition-shadow bg-white dark:bg-gray-800">
-                      <CardHeader>
-                        <CardTitle className="text-base dark:text-white">{car.title}</CardTitle>
-                        <CardDescription className="dark:text-gray-300 text-sm">
-                          {car.year} {car.brand} {car.model}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2">
-                          <div className="flex justify-between items-center">
-                            <span className="text-base font-bold text-blue-600">
-                              {formatPrice(car.price)}
-                            </span>
+                    <Card key={car.id} className="overflow-hidden hover:shadow-xl transition-shadow bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 group">
+                      {/* Car Image */}
+                      <div className="relative h-48 overflow-hidden">
+                        {car.images && car.images[0] ? (
+                          <img
+                            src={car.images[0]}
+                            alt={car.title}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                            <Car className="h-12 w-12 text-gray-400 dark:text-gray-500" />
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+                        <div className="absolute bottom-4 left-4 right-4">
+                          <div className="flex justify-between items-end">
+                            <div>
+                              <h3 className="text-lg font-bold text-white truncate">{car.title}</h3>
+                              <p className="text-sm text-gray-200">
+                                {car.year} {car.brand} {car.model}
+                              </p>
+                            </div>
                             <span className={`px-2 py-1 rounded text-xs font-medium ${
                               car.availability === 'Available'
-                                ? 'bg-green-100 text-green-800'
+                                ? 'bg-green-500 text-white'
                                 : car.availability === 'Sold'
-                                ? 'bg-gray-100 text-gray-800'
-                                : 'bg-yellow-100 text-yellow-800'
+                                ? 'bg-red-500 text-white'
+                                : car.availability === 'Booked'
+                                ? 'bg-yellow-500 text-black'
+                                : 'bg-gray-500 text-white'
                             }`}>
                               {car.availability}
                             </span>
                           </div>
-                          <div className="flex flex-wrap gap-2 pt-2">
-                            <Link href={`/cars/${car.id}`} className="flex-1 min-w-[60px]">
-                              <Button variant="outline" size="sm" className="w-full">
-                                <span className="text-xs">View</span>
+                        </div>
+                      </div>
+
+                      <CardContent className="p-4">
+                        <div className="flex justify-between items-center mb-4">
+                          <span className="text-xl font-bold text-blue-600 dark:text-blue-400">
+                            {formatPrice(car.price)}
+                          </span>
+                          {car.mileage && (
+                            <span className="text-sm text-gray-600 dark:text-gray-300">
+                              {car.mileage} km
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex flex-wrap gap-2 mb-4">
+                          {car.fuel_type && (
+                            <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-xs rounded">
+                              {car.fuel_type}
+                            </span>
+                          )}
+                          {car.transmission && (
+                            <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-xs rounded">
+                              {car.transmission}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                          <Link href={`/cars/${car.id}`} className="flex-1 min-w-[80px]">
+                            <Button variant="outline" size="sm" className="w-full">
+                              <span className="text-sm">View Details</span>
+                            </Button>
+                          </Link>
+                          <Link href={`/admin/edit-car/${car.id}`} className="flex-1 min-w-[80px]">
+                            <Button size="sm" className="w-full bg-blue-600 hover:bg-blue-700 text-white">
+                              <span className="text-sm">Edit</span>
+                            </Button>
+                          </Link>
+                          {car.availability === 'Booked' && (
+                            <Link href={`/chat/${car.id}`} className="flex-1 min-w-[80px]">
+                              <Button size="sm" variant="outline" className="w-full">
+                                <MessageCircle className="h-4 w-4 mr-1" />
+                                <span className="text-sm">Chat</span>
                               </Button>
                             </Link>
-                            <Link href={`/admin/edit-car/${car.id}`} className="flex-1 min-w-[60px]">
-                              <Button size="sm" className="w-full bg-blue-600 hover:bg-blue-700 text-white">
-                                <span className="text-xs">Edit</span>
-                              </Button>
-                            </Link>
-                            {car.availability === 'Booked' && (
-                              <Link href={`/chat/${car.id}`} className="flex-1 min-w-[60px]">
-                                <Button size="sm" variant="outline" className="w-full bg-green-100 hover:bg-green-50 text-green-700 border-green-200">
-                                  <MessageCircle className="h-4 w-4 mr-1" />
-                                  <span className="text-xs">Chat</span>
-                                </Button>
-                              </Link>
-                            )}
-                          </div>
+                          )}
                         </div>
                       </CardContent>
                     </Card>
@@ -814,7 +867,7 @@ export default function AdminDashboard() {
                     <p className="text-sm sm:text-base text-gray-700 dark:text-gray-300">{room.description}</p>
                     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 pt-4 border-t">
                       <span className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                        Created: {new Date(room.createdAt).toLocaleDateString()}
+                        Created: {formatSafeDate(room.createdAt)}
                       </span>
                       <span className={`px-2 py-1 rounded text-xs font-medium ${
                         room.isActive
@@ -872,7 +925,7 @@ export default function AdminDashboard() {
                             </div>
                           )}
                           <div className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                            Created: {new Date(booking.created_at).toLocaleDateString()}
+                            Created: {formatSafeDate(booking.created_at)}
                           </div>
                           <div className="flex flex-wrap gap-2">
                             <Link href="/dashboard">
@@ -958,7 +1011,7 @@ export default function AdminDashboard() {
                             </span>
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-                            {new Date(booking.created_at).toLocaleDateString()}
+                            {formatSafeDate(booking.created_at)}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
                             <div className="flex flex-col sm:flex-row gap-2">
@@ -1041,7 +1094,7 @@ export default function AdminDashboard() {
                               )}
                             </div>
                             <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                              {chat.updatedAt ? new Date(chat.updatedAt).toLocaleDateString() : 'Unknown time'}
+                              {chat.updatedAt ? formatSafeDate(chat.updatedAt) : 'Unknown time'}
                             </div>
                           </div>
                           <div className="flex justify-end">
@@ -1123,7 +1176,7 @@ export default function AdminDashboard() {
                         </div>
                         <div className="flex flex-col sm:items-end sm:text-right">
                           <span className="text-xs text-gray-500 dark:text-gray-400">
-                            {new Date(notification.timestamp).toLocaleDateString()}
+                            {formatSafeDate(notification.timestamp)}
                           </span>
                           {!notification.read && (
                             <span className="mt-1 h-2 w-2 rounded-full bg-blue-500"></span>

@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { usePusher } from "@/hooks/usePusher";
 import { supabase } from "@/lib/supabase";
+import { ChatSkeleton } from '@/components/skeletons/ChatSkeleton';
 
 interface Car {
   id: string;
@@ -622,14 +623,7 @@ export default function NewChatPage() {
   };
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
-          <p className="text-gray-600">Loading chat...</p>
-        </div>
-      </div>
-    );
+    return <ChatSkeleton />;
   }
 
   if (!car || !conversationId) {

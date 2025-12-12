@@ -17,6 +17,7 @@ import { Separator } from '@/components/ui/separator';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useUser } from '@/context/user-context'; // Import useUser
 import { useToast } from '@/hooks/use-toast'; // Import useToast
+import { RoomDetailsSkeleton } from '@/components/skeletons/RoomDetailsSkeleton';
 
 interface Car {
   id: string;
@@ -376,14 +377,7 @@ export default function RoomDetailsPage() {
   };
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
-          <p className="text-gray-600">Loading showroom...</p>
-        </div>
-      </div>
-    );
+    return <RoomDetailsSkeleton />;
   }
 
   if (!room) {

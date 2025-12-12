@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Users, Home, Car, BarChart3, Settings, Loader2, Trash2, Edit, Eye, MessageCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useUser } from '@/context/user-context';
+import { AdminDashboardSkeleton } from '@/components/skeletons/AdminDashboardSkeleton';
 
 interface User {
   id: string;
@@ -359,14 +360,7 @@ export default function SuperAdminDashboard() {
   };
 
   if (loading || isLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600 dark:text-blue-400" />
-          <p className="text-gray-600 dark:text-gray-300">Loading super admin dashboard...</p>
-        </div>
-      </div>
-    );
+    return <AdminDashboardSkeleton />;
   }
 
   if (!user) {

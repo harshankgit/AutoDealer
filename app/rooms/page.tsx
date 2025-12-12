@@ -11,6 +11,9 @@ import { MapPin, Users, Car, Search, Loader2, Trash2, Edit } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { useUser } from '@/context/user-context'; // Import useUser hook
+import { toast } from 'sonner';
+import { RoomCardSkeleton } from '@/components/skeletons/RoomCardSkeleton';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface Room {
   id: string;
@@ -76,7 +79,7 @@ export default function RoomsPage() {
         setError(data.error || 'Failed to fetch rooms');
       }
     } catch (error) {
-      setError('Network error. Please try again.');
+      toast.error('Network error. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -100,13 +103,13 @@ export default function RoomsPage() {
       if (response.ok) {
         setRooms(rooms.filter(room => room.id !== roomid));
         setFilteredRooms(filteredRooms.filter(room => room.id !== roomid));
-        setError('Showroom deleted successfully.');
+        toast.success('Showroom deleted successfully!');
       } else {
         const errorData = await response.json();
-        setError(errorData.error || 'Failed to delete showroom.');
+        toast.error(errorData.error || 'Failed to delete showroom.');
       }
     } catch (error) {
-      setError('Network error. Please try again.');
+      toast.error('Network error. Please try again.');
     }
   };
 
@@ -150,13 +153,13 @@ export default function RoomsPage() {
         setRooms(rooms.map(room => room.id === currentRoom.id ? updatedRoom : room));
         setFilteredRooms(filteredRooms.map(room => room.id === currentRoom.id ? updatedRoom : room));
         setIsEditRoomDialogOpen(false);
-        setError('Showroom updated successfully.');
+        toast.success('Showroom updated successfully!');
       } else {
         const errorData = await response.json();
         setEditRoomError(errorData.error || 'Failed to update showroom.');
       }
     } catch (error) {
-      setEditRoomError('Network error. Please try again.');
+      toast.error('Network error. Please try again.');
     } finally {
       setIsSavingRoom(false);
     }
@@ -164,10 +167,27 @@ export default function RoomsPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
-          <p className="text-gray-600">Loading showrooms...</p>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 dark:from-gray-900 dark:to-gray-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* Header Skeleton */}
+          <div className="text-center mb-12">
+            <Skeleton className="h-10 w-96 mx-auto mb-4 rounded-xl" />
+            <Skeleton className="h-6 w-[500px] mx-auto rounded-lg" />
+          </div>
+
+          {/* Search Bar Skeleton */}
+          <div className="max-w-2xl mx-auto mb-8">
+            <div className="relative">
+              <Skeleton className="h-12 w-full pl-10 rounded-lg" />
+            </div>
+          </div>
+
+          {/* Rooms Grid Skeleton */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {[...Array(6)].map((_, index) => (
+              <RoomCardSkeleton key={index} />
+            ))}
+          </div>
         </div>
       </div>
     );

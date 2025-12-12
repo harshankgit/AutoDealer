@@ -63,7 +63,7 @@
     "encoding": "^0.1.13",
     "eslint": "8.49.0",
     "eslint-config-next": "13.5.1",
-    "framer-motion": "^12.23.24",
+    "framer-motion": "^12.23.26",
     "input-otp": "^1.2.4",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.446.0",

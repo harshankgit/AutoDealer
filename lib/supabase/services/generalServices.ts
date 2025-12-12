@@ -150,6 +150,26 @@ export const roomServices = {
     }
   },
 
+  async getRoomByIdForAdmin(roomid: string): Promise<Room | null> {
+    try {
+      const { data, error } = await getSupabaseServiceRole()
+        .from('rooms')
+        .select('*')
+        .eq('id', roomid)
+        .single();
+
+      if (error) {
+        console.error('Error getting room by ID for admin:', error);
+        return null;
+      }
+
+      return data as Room;
+    } catch (error) {
+      console.error('Error in getRoomByIdForAdmin:', error);
+      return null;
+    }
+  },
+
   async getRoomByadminid(adminid: string): Promise<Room | null> {
     try {
       const { data, error } = await getSupabaseServiceRole()
@@ -231,7 +251,7 @@ export const roomServices = {
 
   async updateRoom(roomid: string, roomData: Partial<Room>): Promise<Room | null> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await getSupabaseServiceRole()
         .from('rooms')
         .update(roomData)
         .eq('id', roomid)
@@ -246,6 +266,27 @@ export const roomServices = {
       return data as Room;
     } catch (error) {
       console.error('Error in updateRoom:', error);
+      return null;
+    }
+  },
+
+  async updateRoomForAdmin(roomid: string, roomData: Partial<Room>): Promise<Room | null> {
+    try {
+      const { data, error } = await getSupabaseServiceRole()
+        .from('rooms')
+        .update(roomData)
+        .eq('id', roomid)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error updating room for admin:', error);
+        return null;
+      }
+
+      return data as Room;
+    } catch (error) {
+      console.error('Error in updateRoomForAdmin:', error);
       return null;
     }
   },

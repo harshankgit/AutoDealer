@@ -36,6 +36,7 @@ export async function PUT(req: Request, { params }: { params: Params }) {
   const decoded: any = verifyToken(token);
 
   if (!decoded || (decoded.role !== 'admin' && decoded.role !== 'superadmin')) {
+    console.error('Authentication failed. Decoded token:', decoded);
     return NextResponse.json({ error: 'Unauthorized or forbidden' }, { status: 401 });
   }
 
@@ -46,18 +47,27 @@ export async function PUT(req: Request, { params }: { params: Params }) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
+    console.log('Attempting to find room with ID:', id);
+    console.log('Authenticated user ID:', decoded.userId);
+    console.log('Authenticated user role:', decoded.role);
+
     // Check if the user is the owner of the room or a superadmin
-    const room = await roomServices.getRoomById(id);
+    // Use service role client to bypass RLS for admin operations
+    const room = await roomServices.getRoomByIdForAdmin(id);
+    console.log('Room found:', room);
+
     if (!room) {
+      console.error('Room not found in database:', id);
       return NextResponse.json({ error: 'Showroom not found' }, { status: 404 });
     }
 
     // Only allow admin to edit their own room, superadmin can edit any room
     if (decoded.role === 'admin' && room.adminid !== decoded.userId) {
+      console.error('Admin does not own this room. Room admin ID:', room.adminid, 'vs decoded user ID:', decoded.userId);
       return NextResponse.json({ error: 'Forbidden: You can only edit your own showroom' }, { status: 403 });
     }
 
-    const updatedRoom = await roomServices.updateRoom(id, {
+    const updatedRoom = await roomServices.updateRoomForAdmin(id, {
       name,
       description,
       location,
@@ -65,7 +75,8 @@ export async function PUT(req: Request, { params }: { params: Params }) {
     });
 
     if (!updatedRoom) {
-      return NextResponse.json({ error: 'Showroom not found' }, { status: 404 });
+      console.error('Failed to update room:', id);
+      return NextResponse.json({ error: 'Failed to update showroom' }, { status: 500 });
     }
 
     return NextResponse.json(updatedRoom, { status: 200 });

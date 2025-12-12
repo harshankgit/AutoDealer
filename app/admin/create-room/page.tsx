@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ArrowLeft, Home, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useUser } from '@/context/user-context';
+import { CreateRoomSkeleton } from '@/components/skeletons/CreateRoomSkeleton';
 
 export default function CreateRoomPage() {
   const [formData, setFormData] = useState({
@@ -104,11 +105,7 @@ export default function CreateRoomPage() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
+    return <CreateRoomSkeleton />;
   }
 
   if (!user) {

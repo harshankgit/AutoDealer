@@ -12,6 +12,7 @@ import { Separator } from '@/components/ui/separator';
 import { ArrowLeft, Car, Plus, X, Loader2, Upload, Image as ImageIcon, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useUser } from '@/context/user-context';
+import { EditCarSkeleton } from '@/components/skeletons/EditCarSkeleton';
 
 export default function EditCarPage() {
   const [formData, setFormData] = useState({
@@ -297,11 +298,7 @@ export default function EditCarPage() {
   };
 
   if (isLoading && !formData.title) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
+    return <EditCarSkeleton />;
   }
 
   return (
