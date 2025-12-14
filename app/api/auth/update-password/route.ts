@@ -1,16 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyToken } from '@/lib/auth';
-
-// Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables');
-}
-
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+import { getSupabaseServiceRole } from '@/lib/supabase/server';
 
 export async function POST(request: Request) {
   try {
@@ -25,6 +16,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Fetch user details to check role
+    const { data: userRoleData, error: userRoleError } = await getSupabaseServiceRole()
+      .from('users')
+      .select('role')
+      .eq('id', decodedToken.userId)
+      .single();
+
+    if (userRoleError) {
+      console.error('Error fetching user data:', userRoleError);
+      return NextResponse.json({ error: 'Failed to verify user role' }, { status: 500 });
+    }
+
+    // Prevent superadmins from changing passwords
+    if (userRoleData?.role === 'superadmin') {
+      return NextResponse.json({ error: 'Super admins cannot change passwords' }, { status: 403 });
+    }
+
     const { currentPassword, newPassword } = await request.json();
     const userId = decodedToken.userId;
 
@@ -36,28 +44,40 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'New password must be at least 6 characters' }, { status: 400 });
     }
 
-    // Verify current password by attempting to sign in
-    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-      email: decodedToken.email, // Get email from token
-      password: currentPassword,
-    });
+    // Fetch user data to verify current password
+    const { data: userPasswordData, error: userPasswordError } = await getSupabaseServiceRole()
+      .from('users')
+      .select('password, email')
+      .eq('id', userId)
+      .single();
 
-    if (signInError) {
+    if (userPasswordError || !userPasswordData) {
+      console.error('Error fetching user data:', userPasswordError);
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    // Verify current password using your custom authentication method
+    const { verifyPassword } = await import('@/lib/auth'); // Assuming you have a verifyPassword function
+    const isCurrentPasswordValid = await verifyPassword(currentPassword, userPasswordData.password);
+
+    if (!isCurrentPasswordValid) {
       return NextResponse.json({ error: 'Current password is incorrect' }, { status: 400 });
     }
 
-    // Update password using Supabase Auth
-    const { error: updateError } = await supabase.auth.updateUser({
-      password: newPassword,
-    });
+    // Hash the new password
+    const { hashPassword } = await import('@/lib/auth'); // Assuming you have a hashPassword function
+    const hashedNewPassword = await hashPassword(newPassword);
+
+    // Update the user's password in the database
+    const { error: updateError } = await getSupabaseServiceRole()
+      .from('users')
+      .update({ password: hashedNewPassword, updated_at: new Date().toISOString() })
+      .eq('id', userId);
 
     if (updateError) {
       console.error('Password update error:', updateError);
       return NextResponse.json({ error: 'Failed to update password' }, { status: 500 });
     }
-
-    // Sign out the user to force re-authentication with the new password
-    await supabase.auth.signOut();
 
     return NextResponse.json({
       message: 'Password updated successfully'

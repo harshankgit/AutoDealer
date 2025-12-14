@@ -32,6 +32,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { CarDetailsSkeleton } from "@/components/skeletons/CarDetailsSkeleton";
+import { useUser } from "@/context/user-context";
 
 interface Car {
   id: string;
@@ -41,9 +42,9 @@ interface Car {
   year: number;
   price: number;
   mileage: number;
-  fuelType: string;
+  fuel_type: string;
   transmission: string;
-  ownershipHistory: string;
+  ownership_history: string;
   images: string[];
   description: string;
   condition: string;
@@ -54,7 +55,7 @@ interface Car {
     torque?: string;
     acceleration?: string;
     topSpeed?: string;
-    features?: string[];
+    features?: string[] | string;
   };
   roomid: {
     id: string;
@@ -66,11 +67,15 @@ interface Car {
       address?: string;
     };
   };
-  adminid: {
+  admin_details: {
     id: string;
     username: string;
     email: string;
+    phone?: string;
+    role: string;
+    created_at: string;
   } | null;
+  adminid: string; // Store just the admin ID as a string
   createdAt: string;
 }
 
@@ -89,31 +94,47 @@ export default function CarDetailsPage() {
   const [selectedImage, setSelectedImage] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
-  const [user, setUser] = useState<any>(null);
-  const [favorites, setFavorites] = useState<string[]>([]);
+  const [isFavorite, setIsFavorite] = useState(false);
   const [isBookingDialogOpen, setIsBookingDialogOpen] = useState(false);
   const [bookingPhoneNumber, setBookingPhoneNumber] = useState("");
   const [bookingNotes, setBookingNotes] = useState("");
   const [isBookingLoading, setIsBookingLoading] = useState(false);
   const [bookingError, setBookingError] = useState("");
   const [bookingSuccess, setBookingSuccess] = useState(false);
+  const { user } = useUser();
 
   useEffect(() => {
-    if (!carId) return; // wait until route param is available
-    const userData = localStorage.getItem("user");
-    if (!userData) {
-      router.push("/login");
-      return;
-    }
-    setUser(JSON.parse(userData));
-
-    const savedFavorites = localStorage.getItem("favorites");
-    if (savedFavorites) {
-      setFavorites(JSON.parse(savedFavorites));
-    }
+    if (!carId || !user) return; // wait until route param and user data is available
 
     fetchCar();
-  }, [carId, router]);
+    checkIfFavorite();
+  }, [carId, user]);
+
+  const checkIfFavorite = async () => {
+    if (!carId || !user) return;
+
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        router.push("/login");
+        return;
+      }
+
+      const response = await fetch("/api/favorites", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const favoriteIds = data.favorites;
+        setIsFavorite(favoriteIds.includes(carId));
+      }
+    } catch (err) {
+      console.error("Error checking if car is favorite:", err);
+    }
+  };
 
   const fetchCar = async () => {
     try {
@@ -132,15 +153,50 @@ export default function CarDetailsPage() {
     }
   };
 
-  const toggleFavorite = () => {
-    if (!car) return;
+  const toggleFavorite = async () => {
+    if (!car || !user) return;
 
-    const newFavorites = favorites.includes(car.id)
-      ? favorites.filter((id) => id !== car.id)
-      : [...favorites, car.id];
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        router.push("/login");
+        return;
+      }
 
-    setFavorites(newFavorites);
-    localStorage.setItem("favorites", JSON.stringify(newFavorites));
+      if (isFavorite) {
+        // Remove from favorites
+        const response = await fetch(
+          `/api/favorites?carId=${encodeURIComponent(car.id)}`,
+          {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (response.ok) {
+          setIsFavorite(false);
+        }
+      } else {
+        // Add to favorites
+        const response = await fetch("/api/favorites", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ carId: car.id }),
+        });
+
+        if (response.ok) {
+          setIsFavorite(true);
+        }
+      }
+    } catch (err) {
+      console.error("Error toggling favorite:", err);
+      setError("Failed to update favorites");
+    }
   };
 
   const handleSubmitBooking = async () => {
@@ -337,14 +393,15 @@ export default function CarDetailsPage() {
                   <div className="flex items-center">
                     <Fuel className="h-4 w-4 mr-2 text-muted-foreground" />
                     <span className="text-sm text-foreground">
-                      <span className="font-medium">Fuel:</span> {car.fuelType}
+                      <span className="font-medium">Fuel:</span>{" "}
+                      {car?.fuel_type}
                     </span>
                   </div>
                   <div className="flex items-center">
                     <Users className="h-4 w-4 mr-2 text-muted-foreground" />
                     <span className="text-sm text-foreground">
                       <span className="font-medium">Owner:</span>{" "}
-                      {car.ownershipHistory}
+                      {car.ownership_history}
                     </span>
                   </div>
                   <div className="flex items-center">
@@ -374,7 +431,7 @@ export default function CarDetailsPage() {
 
             {/* Actions */}
             <div className="flex flex-wrap gap-3 sm:flex-nowrap">
-              {user && user.id !== car.adminid && (
+              {user && car.adminid && user.id !== car.adminid && (
                 <Link href={`/chat/${car.id}`} className="flex-1">
                   <Button className="w-full bg-blue-600 hover:bg-blue-700">
                     <MessageCircle className="h-4 w-4 mr-2" />
@@ -382,24 +439,18 @@ export default function CarDetailsPage() {
                   </Button>
                 </Link>
               )}
-              {user && user.id !== car.adminid && (
+              {user && car.adminid && user.id !== car.adminid && (
                 <Button
                   variant="outline"
                   onClick={toggleFavorite}
-                  className={
-                    favorites.includes(car.id)
-                      ? "text-red-600 border-red-600"
-                      : ""
-                  }
+                  className={isFavorite ? "text-red-600 border-red-600" : ""}
                 >
                   <Heart
-                    className={`h-4 w-4 ${
-                      favorites.includes(car.id) ? "fill-current" : ""
-                    }`}
+                    className={`h-4 w-4 ${isFavorite ? "fill-current" : ""}`}
                   />
                 </Button>
               )}
-              {user && user.id !== car.adminid && (
+              {user && car.adminid && user.id !== car.adminid && (
                 <Button
                   onClick={() => setIsBookingDialogOpen(true)}
                   className="bg-green-600 hover:bg-green-700"
@@ -494,24 +545,24 @@ export default function CarDetailsPage() {
                         .toUpperCase()}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      Contact admin for location
+                      {car.admin_details?.phone || "Contact admin for location"}
                     </p>
                   </div>
 
                   <div>
                     <p className="text-sm text-muted-foreground">
-                      Contact Person: {car.adminid?.username || "Unknown"}
+                      Contact Person: {car.admin_details?.username || "Unknown"}
                     </p>
                   </div>
 
                   <div className="space-y-2">
                     <div className="flex items-center text-sm text-foreground">
                       <Phone className="h-4 w-4 mr-2 text-muted-foreground" />
-                      Contact admin for details
+                      {car.admin_details?.phone || "Contact admin for details"}
                     </div>
                     <div className="flex items-center text-sm text-foreground">
                       <Mail className="h-4 w-4 mr-2 text-muted-foreground" />
-                      Contact admin for details
+                      {car.admin_details?.email || "Contact admin for details"}
                     </div>
                   </div>
                 </div>
@@ -588,28 +639,72 @@ export default function CarDetailsPage() {
                   )}
                 </div>
 
-                {car.specifications.features &&
-                  car.specifications.features.length > 0 && (
-                    <>
-                      <Separator className="my-4" />
-                      <div>
-                        <h4 className="font-medium mb-2 text-foreground">
-                          Features:
-                        </h4>
-                        <div className="flex flex-wrap gap-2">
-                          {car.specifications.features.map((feature, index) => (
-                            <Badge
-                              key={index}
-                              variant="secondary"
-                              className="text-xs bg-secondary text-secondary-foreground"
-                            >
-                              {feature}
-                            </Badge>
-                          ))}
-                        </div>
+                {car.specifications.features && (
+                  <>
+                    <Separator className="my-4" />
+                    <div>
+                      <h4 className="font-medium mb-2 text-foreground">
+                        Features:
+                      </h4>
+                      <div className="space-y-2">
+                        {Array.isArray(car.specifications.features) ? (
+                          // If features is an array
+                          car.specifications.features.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                              {car.specifications.features.map((feature, index) => (
+                                <Badge
+                                  key={index}
+                                  variant="secondary"
+                                  className="text-xs bg-secondary text-secondary-foreground"
+                                >
+                                  {feature}
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : null
+                        ) : (
+                          // If features is a string/blob, format it properly
+                          <div className="prose prose-sm max-w-none dark:prose-invert text-foreground">
+                            {typeof car.specifications.features === 'string' ? (
+                              car.specifications.features.split('\n').map((line, index) => {
+                                // Check if the line looks like a section header (contains colon)
+                                const colonIndex = line.indexOf(':');
+                                if (colonIndex > 0) {
+                                  const header = line.substring(0, colonIndex).trim();
+                                  const content = line.substring(colonIndex + 1).trim();
+
+                                  // Only treat as header if the header part starts with uppercase and looks like a category
+                                  if (/^[A-Z]/.test(header) && header.length > 1) {
+                                    return (
+                                      <div key={index} className="mb-2">
+                                        <h5 className="font-semibold text-base text-foreground mb-1">{header}:</h5>
+                                        {content && (
+                                          <p className="text-sm text-muted-foreground leading-relaxed">
+                                            {content}
+                                          </p>
+                                        )}
+                                      </div>
+                                    );
+                                  }
+                                }
+
+                                // For lines that are not headers, just display as paragraph if not empty
+                                const trimmedLine = line.trim();
+                                return trimmedLine ? (
+                                  <p key={index} className="text-sm text-muted-foreground mb-1">
+                                    {trimmedLine}
+                                  </p>
+                                ) : null;
+                              })
+                            ) : (
+                              <p className="text-sm text-muted-foreground">No features listed</p>
+                            )}
+                          </div>
+                        )}
                       </div>
-                    </>
-                  )}
+                    </div>
+                  </>
+                )}
               </CardContent>
             </Card>
           )}

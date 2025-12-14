@@ -43,6 +43,7 @@ interface Car {
 
 export default function AdminDashboard() {
   const [room, setRoom] = useState<Room | null>(null);
+
   interface Booking {
     id: string;
     carid: string;
@@ -202,7 +203,7 @@ export default function AdminDashboard() {
               totalRevenue: 0,
             });
           }
-          
+
           if (bookingsResponse.ok) {
             const bookingsData = await bookingsResponse.json();
             setBookings(bookingsData.bookings || []);
@@ -417,7 +418,7 @@ export default function AdminDashboard() {
               Create Your Showroom
             </h2>
             <p className="text-gray-500 dark:text-gray-400 mb-8 max-w-2xl mx-auto">
-              You haven't created a showroom yet. Create your virtual showroom to start 
+              You haven't created a showroom yet. Create your virtual showroom to start
               adding and managing your car listings.
             </p>
             <Link href="/admin/create-room">
@@ -574,76 +575,89 @@ export default function AdminDashboard() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div className="grid grid-cols-1 gap-8">
                       {/* Monthly Bookings Chart */}
                       <div>
                         <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Monthly Bookings</h3>
-                        <div className="h-64 flex items-end space-x-2 justify-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                        <div className="h-64 sm:h-72 md:h-80 flex items-end space-x-1 sm:space-x-2 justify-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg overflow-x-auto">
                           {chartLoading ? (
-                            <div className="flex items-center justify-center h-full">
+                            <div className="flex items-center justify-center h-full w-full">
                               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
                             </div>
                           ) : chartData.monthlyData.length > 0 ? (
                             chartData.monthlyData.map((monthData, index) => {
                               // Calculate max value to scale the bars
                               const maxValue = Math.max(...chartData.monthlyData.map(m => (m as any).bookings || 0), 1);
-                              const barHeight = ((monthData as any).bookings / maxValue) * 200; // Max height of 200px
+                              const barHeight = Math.min(((monthData as any).bookings / maxValue) * 120, 200); // Cap max height and make it smaller for mobile
 
                               return (
-                                <div key={index} className="flex flex-col items-center flex-1">
-                                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                <div key={index} className="flex flex-col items-center flex-shrink-0">
+                                  <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mb-1">
                                     {(monthData as any).monthName}
                                   </div>
                                   <div
-                                    className="w-6 bg-blue-500 rounded-t hover:bg-blue-600 transition-colors"
+                                    className="w-4 sm:w-6 bg-blue-500 rounded-t hover:bg-blue-600 transition-colors"
                                     style={{ height: `${barHeight}px` }}
                                     title={`${(monthData as any).bookings} bookings in ${(monthData as any).monthName}`}
                                   ></div>
-                                  <div className="text-xs mt-1 text-gray-600 dark:text-gray-300">
+                                  <div className="text-xs sm:text-sm mt-1 text-gray-600 dark:text-gray-300">
                                     {(monthData as any).bookings}
                                   </div>
                                 </div>
                               );
                             })
                           ) : (
-                            <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">
+                            <div className="flex items-center justify-center h-full w-full text-gray-500 dark:text-gray-400">
                               No data available
                             </div>
                           )}
                         </div>
                       </div>
 
-                      {/* Availability Chart */}
-                      <div>
-                        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Car Availability</h3>
-                        <div className="flex items-center justify-center h-64">
-                          {chartLoading ? (
-                            <div className="flex items-center justify-center h-full">
-                              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-                            </div>
-                          ) : (
-                            <div className="flex items-center justify-center w-full">
-                              <div className="relative w-48 h-48">
+                      {/* Availability Chart - Responsive */}
+                      <div className="flex flex-col md:flex-row items-center justify-center gap-4">
+                        <div>
+                          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4 text-center md:text-left">Car Availability</h3>
+                          <div className="flex items-center justify-center h-64">
+                            {chartLoading ? (
+                              <div className="flex items-center justify-center h-full">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                              </div>
+                            ) : (
+                              <div>
+                              <div className="flex items-center justify-center w-full">
+                                <div className="relative w-32 h-32 sm:w-40 sm:h-40 md:w-48 md:h-48">
                                 {/* Simple pie chart visualization */}
-                                <div
-                                  className="absolute top-0 left-0 w-full h-full rounded-full border-8 border-green-500"
-                                  style={{
-                                    clipPath: `inset(0 0 ${100 - (chartData.availabilityData.available / (chartData.availabilityData.available + chartData.availabilityData.sold + chartData.availabilityData.reserved || 1) * 100)}% 0)`
-                                  }}
-                                ></div>
-                                <div
-                                  className="absolute top-0 left-0 w-full h-full rounded-full border-8 border-yellow-500"
-                                  style={{
-                                    clipPath: `inset(${(chartData.availabilityData.available / (chartData.availabilityData.available + chartData.availabilityData.sold + chartData.availabilityData.reserved || 1) * 100)}% 0 0 0)`
-                                  }}
-                                ></div>
-                                <div
-                                  className="absolute top-0 left-0 w-full h-full rounded-full border-8 border-red-500"
-                                  style={{
-                                    clipPath: `inset(${(chartData.availabilityData.available + chartData.availabilityData.sold) / (chartData.availabilityData.available + chartData.availabilityData.sold + chartData.availabilityData.reserved || 1) * 100}% 0 0 ${100 - (chartData.availabilityData.available + chartData.availabilityData.sold) / (chartData.availabilityData.available + chartData.availabilityData.sold + chartData.availabilityData.reserved || 1) * 100}% )`
-                                  }}
-                                ></div>
+                                {(() => {
+                                  // Calculate percentages based on availability data
+                                  const total = chartData.availabilityData.available + chartData.availabilityData.sold + chartData.availabilityData.reserved || 1;
+                                  const availablePercent = (chartData.availabilityData.available / total) * 100;
+                                  const reservedPercent = (chartData.availabilityData.reserved / total) * 100;
+                                  const availableAndReservedPercent = (chartData.availabilityData.available + chartData.availabilityData.reserved) / total * 100;
 
+                                  return (
+                                    <>
+                                      <div
+                                        className="absolute top-0 left-0 w-full h-full rounded-full border-8 border-green-500"
+                                        style={{
+                                          clipPath: `inset(0 0 ${100 - availablePercent}% 0)`
+                                        }}
+                                      ></div>
+                                      <div
+                                        className="absolute top-0 left-0 w-full h-full rounded-full border-8 border-yellow-500"
+                                        style={{
+                                          clipPath: `inset(${availablePercent}% 0 0 0)`
+                                        }}
+                                      ></div>
+                                      <div
+                                        className="absolute top-0 left-0 w-full h-full rounded-full border-8 border-red-500"
+                                        style={{
+                                          clipPath: `inset(${availableAndReservedPercent}% 0 0 ${100 - availableAndReservedPercent}% )`
+                                        }}
+                                      ></div>
+                                    </>
+                                  );
+                                })()}
                                 <div className="absolute inset-0 flex items-center justify-center">
                                   <div className="text-center">
                                     <div className="text-2xl font-bold dark:text-white">
@@ -652,20 +666,21 @@ export default function AdminDashboard() {
                                     <div className="text-sm text-gray-500 dark:text-gray-400">Total Cars</div>
                                   </div>
                                 </div>
-                              </div>
-
-                              <div className="ml-8">
-                                <div className="flex items-center mb-2">
-                                  <div className="w-4 h-4 bg-green-500 rounded mr-2"></div>
-                                  <span className="text-sm">Available: {chartData.availabilityData.available}</span>
                                 </div>
-                                <div className="flex items-center mb-2">
+                              </div>
+                              {/* Legend for the pie chart */}
+                              <div className="flex flex-col items-center md:items-start mt-4 md:mt-0">
+                                <div className="flex items-center mb-1">
+                                  <div className="w-4 h-4 bg-green-500 rounded mr-2"></div>
+                                  <span className="text-xs sm:text-sm">Available: {chartData.availabilityData.available}</span>
+                                </div>
+                                <div className="flex items-center mb-1">
                                   <div className="w-4 h-4 bg-yellow-500 rounded mr-2"></div>
-                                  <span className="text-sm">Reserved: {chartData.availabilityData.reserved}</span>
+                                  <span className="text-xs sm:text-sm">Reserved: {chartData.availabilityData.reserved}</span>
                                 </div>
                                 <div className="flex items-center">
                                   <div className="w-4 h-4 bg-red-500 rounded mr-2"></div>
-                                  <span className="text-sm">Sold: {chartData.availabilityData.sold}</span>
+                                  <span className="text-xs sm:text-sm">Sold: {chartData.availabilityData.sold}</span>
                                 </div>
                               </div>
                             </div>
@@ -699,6 +714,7 @@ export default function AdminDashboard() {
                         <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-300">Confirmed Bookings</div>
                       </div>
                     </div>
+                     </div>
                   </CardContent>
                 </Card>
               </div>

@@ -245,7 +245,15 @@ export default function Navbar() {
           </div>
 
           {/* Mobile menu button */}
-          <div className="md:hidden">
+          <div className="md:hidden flex items-center space-x-2">
+            <div className="px-1 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-300">
+              <motion.div
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <ThemeToggle />
+              </motion.div>
+            </div>
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.95 }}
@@ -526,19 +534,6 @@ export default function Navbar() {
                     </motion.div>
                   </>
                 )}
-                <motion.div
-                  custom={7}
-                  variants={menuItemVariants}
-                  initial="closed"
-                  animate="open"
-                >
-                  <div className="px-3 py-2 flex items-center">
-                    <div className="mr-2">
-                      <ThemeToggle />
-                    </div>
-                    <span className="text-gray-700 dark:text-gray-300">Theme</span>
-                  </div>
-                </motion.div>
               </div>
             </motion.div>
           )}

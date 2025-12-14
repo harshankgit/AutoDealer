@@ -21,11 +21,12 @@ interface Room {
   description: string;
   location: string;
   image: string;
-  adminid: {
-    id?: string;
-    username?: string;
-    email?: string;
-  } | null;
+  contact_info?: {
+    phone?: string | null;
+    email?: string | null;
+    username?: string | null;
+  };
+  adminid: string; // Just the admin ID as a string
   createdAt: string;
 }
 
@@ -62,7 +63,7 @@ export default function RoomsPage() {
     const filtered = rooms.filter(room =>
       room.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       room.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (room.adminid?.username && room.adminid.username.toLowerCase().includes(searchTerm.toLowerCase()))
+      (room.contact_info?.username && room.contact_info.username.toLowerCase().includes(searchTerm.toLowerCase()))
     );
     setFilteredRooms(filtered);
   }, [searchTerm, rooms]);
@@ -287,7 +288,7 @@ export default function RoomsPage() {
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
                         <Users className="h-4 w-4 mr-1" />
-                        <span>Dealer: {room.adminid?.username || 'Unknown'}</span>
+                        <span>Dealer: {room.contact_info?.username || 'Unknown'}</span>
                       </div>
                       {(
                         user?.role === 'superadmin' ||

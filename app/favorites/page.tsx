@@ -1,12 +1,24 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Heart, Car, Eye, MessageCircle, Calendar, Fuel, Users, Loader2 } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  Heart,
+  Car,
+  Eye,
+  MessageCircle,
+  Calendar,
+  Fuel,
+  Users,
+  Loader2,
+} from "lucide-react";
+import { useUser } from "@/context/user-context";
+import { CommonSkeleton } from "@/components/skeletons/CommonSkeleton";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface Car {
   id: string;
@@ -16,7 +28,7 @@ interface Car {
   year: number;
   price: number;
   mileage: number;
-  fuelType: string;
+  fuel_type: string;
   transmission: string;
   ownershipHistory: string;
   images: string[];
@@ -33,49 +45,65 @@ interface Car {
 }
 
 export default function FavoritesPage() {
-  const [favorites, setFavorites] = useState<string[]>([]);
   const [favoriteCars, setFavoriteCars] = useState<Car[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [user, setUser] = useState<any>(null);
+  const [error, setError] = useState("");
   const router = useRouter();
+  const { user } = useUser();
 
   useEffect(() => {
-    const userData = localStorage.getItem('user');
-    if (!userData) {
-      router.push('/login');
-      return;
-    }
-    setUser(JSON.parse(userData));
-    
-    const savedFavorites = localStorage.getItem('favorites');
-    if (savedFavorites) {
-      const favoriteIds = JSON.parse(savedFavorites);
-      setFavorites(favoriteIds);
-      fetchFavoriteCars(favoriteIds);
-    } else {
-      setIsLoading(false);
-    }
-  }, [router]);
-
-  const fetchFavoriteCars = async (favoriteIds: string[]) => {
-    if (favoriteIds.length === 0) {
-      setIsLoading(false);
+    if (!user) {
+      router.push("/login");
       return;
     }
 
+    fetchFavoriteCars();
+  }, [user, router]);
+
+  const fetchFavoriteCars = async () => {
     try {
-      const carPromises = favoriteIds.map(id =>
-        fetch(`/api/cars/${id}`).then(res => res.json())
+      const token = localStorage.getItem("token");
+      if (!token) {
+        router.push("/login");
+        return;
+      }
+
+      const response = await fetch("/api/favorites", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to fetch favorites");
+      }
+
+      const data = await response.json();
+      const favoriteIds = data.favorites;
+
+      if (favoriteIds.length === 0) {
+        setIsLoading(false);
+        return;
+      }
+
+      const carPromises = favoriteIds.map((id: string) =>
+        fetch(`/api/cars/${id}`).then((res) => res.json())
       );
 
       const carResults = await Promise.all(carPromises);
       const validCars = carResults
-        .filter(result => result.car)
-        .map(result => result.car);
+        .filter((result: any) => result.car)
+        .map((result: any) => result.car);
 
       // Fetch room information for each unique room ID
-      const roomIds = Array.from(new Set(validCars.map(car => car.roomid))).filter(Boolean) as string[];
+      const uniqueRoomIds = new Set<string>();
+      const roomIds = validCars
+        .map((car: any) => car.roomid)
+        .filter(
+          (id: string | undefined) =>
+            id && !uniqueRoomIds.has(id) && uniqueRoomIds.add(id)
+        ) as string[];
       const roomMap: Record<string, any> = {};
 
       if (roomIds.length > 0) {
@@ -93,43 +121,59 @@ export default function FavoritesPage() {
       }
 
       // Add room information to each car
-      const carsWithRoomInfo = validCars.map(car => ({
+      const carsWithRoomInfo = validCars.map((car: any) => ({
         ...car,
-        roomInfo: roomMap[car.roomid || car.roomid] || null
+        roomInfo: roomMap[car.roomid || car.roomid] || null,
       }));
 
       setFavoriteCars(carsWithRoomInfo);
-    } catch (error) {
-      setError('Failed to load favorite cars');
+    } catch (err: any) {
+      setError(err.message || "Failed to load favorite cars");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const removeFavorite = (carId: string) => {
-    const newFavorites = favorites.filter(id => id !== carId);
-    setFavorites(newFavorites);
-    setFavoriteCars(prev => prev.filter(car => car.id !== carId));
-    localStorage.setItem('favorites', JSON.stringify(newFavorites));
+  const removeFromFavorites = async (carId: string) => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        router.push("/login");
+        return;
+      }
+
+      const response = await fetch(
+        `/api/favorites?carId=${encodeURIComponent(carId)}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to remove from favorites");
+      }
+
+      // Remove car from the UI immediately
+      setFavoriteCars((prev) => prev.filter((car) => car.id !== carId));
+    } catch (err: any) {
+      setError(err.message || "Failed to remove from favorites");
+    }
   };
 
   const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
       minimumFractionDigits: 0,
     }).format(price);
   };
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
-          <p className="text-gray-600">Loading your favorites...</p>
-        </div>
-      </div>
-    );
+    return <CommonSkeleton variant="page" count={1} />;
   }
 
   return (
@@ -163,7 +207,8 @@ export default function FavoritesPage() {
               No favorite cars yet
             </h3>
             <p className="text-gray-500 dark:text-gray-400 mb-6">
-              Start browsing cars and add them to your favorites by clicking the heart icon.
+              Start browsing cars and add them to your favorites by clicking the
+              heart icon.
             </p>
             <Link href="/rooms">
               <Button className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800">
@@ -176,48 +221,67 @@ export default function FavoritesPage() {
           <>
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                {favoriteCars.length} Favorite{favoriteCars.length !== 1 ? 's' : ''}
+                {favoriteCars.length} Favorite
+                {favoriteCars.length !== 1 ? "s" : ""}
               </h2>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {favoriteCars.map((car) => (
-                <Card key={car.id} className="group hover:shadow-xl transition-all duration-300 border-0 shadow-lg overflow-hidden">
+                <Card
+                  key={car.id}
+                  className="group hover:shadow-xl transition-all duration-300 border-0 shadow-lg overflow-hidden"
+                >
                   <div className="relative h-48 overflow-hidden">
                     <img
-                      src={car.images[0] || 'https://images.pexels.com/photos/116675/pexels-photo-116675.jpeg'}
+                      src={
+                        car.images[0] ||
+                        "https://images.pexels.com/photos/116675/pexels-photo-116675.jpeg"
+                      }
                       alt={car.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                     <div className="absolute top-4 right-4 flex gap-2">
-                      <Badge 
-                        variant={car.availability === 'Available' ? 'default' : 'secondary'}
-                        className={car.availability === 'Available' ? 'bg-green-600' : 'bg-gray-600'}
+                      <Badge
+                        variant={
+                          car.availability === "Available"
+                            ? "default"
+                            : "secondary"
+                        }
+                        className={
+                          car.availability === "Available"
+                            ? "bg-green-600"
+                            : "bg-gray-600"
+                        }
                       >
                         {car.availability}
                       </Badge>
                     </div>
                     <button
-                      onClick={() => removeFavorite(car.id)}
+                      onClick={() => removeFromFavorites(car.id)}
                       className="absolute top-4 left-4 p-2 bg-white/90 rounded-full hover:bg-white transition-colors"
                     >
                       <Heart className="h-4 w-4 fill-red-500 text-red-500" />
                     </button>
                   </div>
-                  
+
                   <CardHeader className="pb-3">
                     <CardTitle className="text-lg text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                       {car.title}
                     </CardTitle>
                     <div className="text-sm text-gray-500 dark:text-gray-400 space-y-1">
-                      <p>{car.year} • {car.brand} {car.model}</p>
-                      <p>From: {car.roomInfo?.name || 'Showroom'}</p>
+                      <p>
+                        {car.year} • {car.brand} {car.model}
+                      </p>
+                      <p>From: {car.roomInfo?.name || "Showroom"}</p>
                       {car.roomInfo?.location && (
-                        <p className="text-xs text-gray-400 dark:text-gray-500">{car.roomInfo.location}</p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500">
+                          {car.roomInfo.location}
+                        </p>
                       )}
                     </div>
                   </CardHeader>
-                  
+
                   <CardContent className="pt-0">
                     <div className="space-y-3">
                       <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
@@ -231,19 +295,22 @@ export default function FavoritesPage() {
                         </div>
                         <div className="flex items-center">
                           <Fuel className="h-4 w-4 mr-1 text-gray-600 dark:text-gray-400" />
-                          {car.fuelType}
+                          {car.fuel_type}
                         </div>
                         <div className="flex items-center">
                           <Users className="h-4 w-4 mr-1 text-gray-600 dark:text-gray-400" />
                           {car.ownershipHistory}
                         </div>
                         <div className="flex items-center">
-                          <Badge variant="outline" className="text-xs dark:border-gray-600">
+                          <Badge
+                            variant="outline"
+                            className="text-xs dark:border-gray-600"
+                          >
                             {car.condition}
                           </Badge>
                         </div>
                       </div>
-                      
+
                       <div className="flex gap-2 pt-2">
                         <Link href={`/cars/${car.id}`} className="flex-1">
                           <Button className="w-full bg-blue-600 hover:bg-blue-700">
@@ -273,27 +340,48 @@ export default function FavoritesPage() {
                   <div className="text-2xl font-bold text-blue-600 dark:text-blue-400 mb-1">
                     {favoriteCars.length}
                   </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">Total Favorites</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    Total Favorites
+                  </div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-green-600 dark:text-green-400 mb-1">
-                    {favoriteCars.filter(car => car.availability === 'Available').length}
+                    {
+                      favoriteCars.filter(
+                        (car) => car.availability === "Available"
+                      ).length
+                    }
                   </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">Available</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    Available
+                  </div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-purple-600 dark:text-purple-400 mb-1">
                     {formatPrice(
-                      favoriteCars.reduce((avg, car) => avg + car.price, 0) / favoriteCars.length || 0
+                      favoriteCars.reduce((avg, car) => avg + car.price, 0) /
+                        favoriteCars.length || 0
                     )}
                   </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">Average Price</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    Average Price
+                  </div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-orange-600 dark:text-orange-400 mb-1">
-                    {new Set(favoriteCars.map(car => car.roomInfo?.id)).size}
+                    {
+                      Array.from(
+                        new Set(
+                          favoriteCars
+                            .map((car) => car.roomInfo?.id)
+                            .filter(Boolean)
+                        )
+                      ).length
+                    }
                   </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">Different Showrooms</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    Different Showrooms
+                  </div>
                 </div>
               </div>
             </div>

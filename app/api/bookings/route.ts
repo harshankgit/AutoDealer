@@ -184,8 +184,90 @@ export async function POST(req: Request) {
       // In a production environment, you might want to use an alternative notification method
     }
 
+    // Send confirmation email to the user who made the booking
+    if (process.env.EMAIL_USER && process.env.EMAIL_PASS && user) {
+      const transporter = nodemailer.createTransport({
+        service: 'gmail', // or your email service provider
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS,
+        },
+      });
+
+      const userMailOptions = {
+        from: process.env.EMAIL_USER,
+        to: user.email, // Send to the user who made the booking
+        subject: 'Booking Confirmation - CarSelling Platform',
+        html: `
+          <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px;">
+            <div style="text-align: center; margin-bottom: 20px;">
+              <h1 style="color: #007bff;">CarSelling Platform</h1>
+              <p style="font-size: 18px; color: #555;">Booking Confirmation</p>
+            </div>
+
+            <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+              <p style="font-size: 16px; margin-bottom: 10px;">Dear ${user.username || 'User'},</p>
+              <p style="margin-bottom: 10px;">Your car booking has been successfully submitted and is currently pending approval. Please review the details below:</p>
+            </div>
+
+            <h2 style="color: #007bff; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 20px;">Booking Information</h2>
+            <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 20px;">
+              <tr>
+                <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Car Title:</strong></td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${car.title}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Brand:</strong></td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${car.brand}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Model:</strong></td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${car.model}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Booking Status:</strong></td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #eee;">Pending</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Contact Phone:</strong></td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${bookingDetails.phone || 'N/A'}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Booking Date:</strong></td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${new Date().toLocaleString()}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0;"><strong>Additional Notes:</strong></td>
+                <td style="padding: 8px 0;">${bookingDetails.notes || 'N/A'}</td>
+              </tr>
+            </table>
+
+            <div style="background-color: #e7f3ff; padding: 15px; border-radius: 5px; margin: 20px 0;">
+              <p style="margin: 0; color: #0066cc;">The car owner will contact you shortly to confirm the booking. You will receive an email notification once your booking status changes.</p>
+            </div>
+
+            <div style="text-align: center; margin-top: 30px;">
+              <a href="https://car-selling-rho.vercel.app/bookings" style="background-color: #007bff; color: #ffffff; padding: 12px 25px; border-radius: 5px; text-decoration: none; font-weight: bold;">View My Bookings</a>
+            </div>
+
+            <div style="text-align: center; margin-top: 40px; font-size: 12px; color: #777;">
+              <p>&copy; ${new Date().getFullYear()} CarSelling Platform. All rights reserved.</p>
+              <p>This is an automated notification, please do not reply to this email.</p>
+            </div>
+          </div>
+        `,
+      };
+
+      try {
+        await transporter.sendMail(userMailOptions);
+      } catch (emailError) {
+        console.error('User confirmation email error:', emailError);
+        // Don't fail the booking if email fails
+      }
+    }
+
     return NextResponse.json({
-      message: 'Car booking created successfully and email notification sent to admin',
+      message: 'Car booking created successfully and email notifications sent',
       booking
     }, { status: 200 });
 

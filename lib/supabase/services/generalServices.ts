@@ -10,13 +10,21 @@ function generateUUID(): string {
   });
 }
 
+// Define the User type for admin details
+export interface ContactInfo {
+  phone?: string | null;
+  email?: string | null;
+  username?: string | null;
+  [key: string]: any; // Allow other properties as well
+}
+
 // Define the Room type
 export interface Room {
   id: string;
   name: string;
   description?: string;
   location?: string;
-  contact_info?: any; // Contact information for the room
+  contact_info?: ContactInfo; // Contact information for the room
   image?: string | null;
   adminid?: string; // Optional adminid for rooms associated with an admin
   is_active?: boolean;
@@ -192,18 +200,49 @@ export const roomServices = {
 
   async getActiveRooms(): Promise<Room[]> {
     try {
-      const { data, error } = await supabase
+      // First, get all active rooms
+      const { data: roomsData, error: roomsError } = await supabase
         .from('rooms')
         .select('*')
         .eq('is_active', true)
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Error getting active rooms:', error);
+      if (roomsError) {
+        console.error('Error getting active rooms:', roomsError);
         return [];
       }
 
-      return data as Room[];
+      // For each room, fetch the admin details
+      const roomsWithAdminDetails = await Promise.all(roomsData.map(async (room) => {
+        if (room.adminid) {
+          const { data: adminData, error: adminError } = await getSupabaseServiceRole()
+            .from('users')
+            .select('id, username, email, phone, role, created_at')
+            .eq('id', room.adminid)
+            .single();
+
+          if (adminError) {
+            console.warn('Error getting admin details for room:', adminError);
+            // Return the room as-is if admin details can't be fetched
+            return room as Room;
+          }
+
+          // Add admin details to the room's contact info
+          return {
+            ...room,
+            contact_info: {
+              phone: adminData.phone || null,
+              email: adminData.email || null,
+              username: adminData.username || null,
+              ...room.contact_info // Preserve existing contact info if any
+            }
+          } as Room;
+        } else {
+          return room as Room;
+        }
+      }));
+
+      return roomsWithAdminDetails;
     } catch (error) {
       console.error('Error in getActiveRooms:', error);
       return [];

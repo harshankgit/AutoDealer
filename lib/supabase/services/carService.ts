@@ -1,6 +1,16 @@
 import { supabase } from '../client';
 import { getSupabaseServiceRole } from '../server';
 
+// Define the User type for admin details
+export interface User {
+  id: string;
+  username: string;
+  email: string;
+  phone?: string;  // Added phone field
+  role: string;
+  created_at: string;
+}
+
 // Define the Car type
 export interface Car {
   id: string;
@@ -20,6 +30,7 @@ export interface Car {
   availability: string;
   roomid: string;
   adminid: string;
+  admin_details?: User;  // Added admin details
   created_at: string;
   updated_at: string;
 }
@@ -128,19 +139,47 @@ export const carServices = {
     try {
       console.log('Fetching car by ID:', carId);
 
-      const { data, error } = await supabase
+      // First, get the car data
+      const { data: carData, error: carError } = await supabase
         .from('cars')
         .select('*')
         .eq('id', carId)
         .single();
 
-      if (error) {
-        console.error('Error getting car by ID from database:', error);
+      if (carError) {
+        console.error('Error getting car by ID from database:', carError);
         return null;
       }
 
-      console.log('Car fetched successfully:', data?.id);
-      return data as Car;
+      if (!carData) {
+        console.log('Car not found with ID:', carId);
+        return null;
+      }
+
+      // Then, get the admin details using the adminid from the car
+      let adminDetails = null;
+      if (carData.adminid) {
+        const { data: userData, error: userError } = await getSupabaseServiceRole()
+          .from('users')
+          .select('id, username, email, phone, role, created_at')
+          .eq('id', carData.adminid)
+          .single();
+
+        if (userError) {
+          console.warn('Error getting admin details for car:', userError);
+        } else {
+          adminDetails = userData;
+        }
+      }
+
+      // Combine car data with admin details
+      const carWithAdmin: Car = {
+        ...carData,
+        admin_details: adminDetails || undefined,
+      };
+
+      console.log('Car with admin details fetched successfully:', carWithAdmin.id);
+      return carWithAdmin;
     } catch (error: any) {
       console.error('Error in getCarById service:', {
         message: error?.message,

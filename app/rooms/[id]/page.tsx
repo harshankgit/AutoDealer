@@ -112,14 +112,14 @@ export default function RoomDetailsPage() {
   const [editCarError, setEditCarError] = useState('');
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false); // New state for delete dialog
   const [carToDeleteId, setCarToDeleteId] = useState<string | null>(null); // New state to store car ID to delete
+  const [favoriteCarIds, setFavoriteCarIds] = useState<string[]>([]);
 
-  // Load favorites from localStorage
+  // Fetch user's favorites when user is loaded
   useEffect(() => {
-    const savedFavorites = localStorage.getItem('favorites');
-    if (savedFavorites) {
-      setFavorites(JSON.parse(savedFavorites));
-    }
-  }, []);
+    if (!user) return; // wait until user data is available
+
+    fetchUserFavorites();
+  }, [user]);
 
   // Fetch room and cars data when user is loaded
   useEffect(() => {
@@ -359,13 +359,87 @@ export default function RoomDetailsPage() {
     setFilteredCars(filtered);
   };
 
-  const toggleFavorite = (carId: string) => {
-    const newFavorites = favorites.includes(carId)
-      ? favorites.filter(id => id !== carId)
-      : [...favorites, carId];
+  const fetchUserFavorites = async () => {
+    if (!user) return;
 
-    setFavorites(newFavorites);
-    localStorage.setItem('favorites', JSON.stringify(newFavorites));
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        router.push('/login');
+        return;
+      }
+
+      const response = await fetch('/api/favorites', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setFavoriteCarIds(data.favorites);
+      }
+    } catch (err) {
+      console.error('Error fetching user favorites:', err);
+    }
+  };
+
+  const toggleFavorite = async (carId: string) => {
+    if (!user) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        router.push('/login');
+        return;
+      }
+
+      if (favoriteCarIds.includes(carId)) {
+        // Remove from favorites
+        const response = await fetch(`/api/favorites?carId=${encodeURIComponent(carId)}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          setFavoriteCarIds(prev => prev.filter(id => id !== carId));
+          toast({
+            title: "Removed from favorites",
+            description: "Car removed from your favorites list.",
+            duration: 3000, // Auto-dismiss after 3 seconds
+          });
+        }
+      } else {
+        // Add to favorites
+        const response = await fetch('/api/favorites', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ carId }),
+        });
+
+        if (response.ok) {
+          setFavoriteCarIds(prev => [...prev, carId]);
+          toast({
+            title: "Added to favorites",
+            description: "Car added to your favorites list.",
+            duration: 3000, // Auto-dismiss after 3 seconds
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Error toggling favorite:', err);
+      toast({
+        title: "Error",
+        description: "Failed to update favorites",
+        variant: "destructive",
+        duration: 3000, // Auto-dismiss after 3 seconds
+      });
+    }
   };
 
   const formatPrice = (price: number) => {
@@ -621,10 +695,10 @@ export default function RoomDetailsPage() {
                           toggleFavorite(car.id);
                         }}
                         className="text-gray-400 hover:text-red-500 focus:outline-none p-1 ml-2 flex-shrink-0"
-                        aria-label={favorites.includes(car.id) ? 'Remove from favorites' : 'Add to favorites'}
+                        aria-label={favoriteCarIds.includes(car.id) ? 'Remove from favorites' : 'Add to favorites'}
                       >
                         <Heart
-                          className={`h-5 w-5 ${favorites.includes(car.id) ? 'fill-red-500 text-red-500' : ''}`}
+                          className={`h-5 w-5 ${favoriteCarIds.includes(car.id) ? 'fill-red-500 text-red-500' : ''}`}
                         />
                       </button>
                     </div>
