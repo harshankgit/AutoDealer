@@ -322,8 +322,10 @@ export default function AdminBookingsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Pending">Pending</SelectItem>
+                  <SelectItem value="Booked">Booked</SelectItem>
                   <SelectItem value="Confirmed">Confirmed</SelectItem>
                   <SelectItem value="Completed">Completed</SelectItem>
+                  <SelectItem value="Sold">Sold</SelectItem>
                   <SelectItem value="Cancelled">Cancelled</SelectItem>
                 </SelectContent>
               </Select>

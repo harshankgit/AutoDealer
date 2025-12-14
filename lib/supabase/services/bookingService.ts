@@ -11,7 +11,7 @@ export interface Booking {
   start_date: string;
   end_date: string;
   total_price: number;
-  status: string; // pending, confirmed, cancelled, completed
+  status: 'Pending' | 'Booked' | 'Confirmed' | 'Completed' | 'Sold' | 'Cancelled';
   created_at: string;
   updated_at: string;
 }
@@ -32,7 +32,7 @@ export const bookingServices = {
             start_date: bookingData.start_date,
             end_date: bookingData.end_date,
             total_price: bookingData.total_price,
-            status: bookingData.status || 'pending'
+            status: bookingData.status || 'Pending'
           }
         ])
         .select()

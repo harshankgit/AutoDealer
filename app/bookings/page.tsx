@@ -37,8 +37,33 @@ interface Booking {
   } | null;
 }
 
+interface BookingWithDetails {
+  id: string;
+  carId: {
+    id: string;
+    title: string;
+    brand: string;
+    model: string;
+    year?: number;
+    price?: number;
+    images?: string[];
+  };
+  roomId: {
+    id: string;
+    name: string;
+    location: string;
+  };
+  bookingDetails: {
+    phone: string;
+    notes: string;
+  };
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export default function UserBookingsPage() {
-  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [bookings, setBookings] = useState<BookingWithDetails[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const router = useRouter();
@@ -148,24 +173,27 @@ export default function UserBookingsPage() {
                   <div className="flex justify-between items-start">
                     <div>
                       <CardTitle className="text-lg dark:text-white">
-                        {booking.car ? (
+                        {booking.carId ? (
                           <>
-                            {booking.car.year || ''} {booking.car.brand} {booking.car.model}
+                            {booking.carId.year || ''} {booking.carId.brand} {booking.carId.model}
                           </>
                         ) : (
                           'Car details not available'
                         )}
                       </CardTitle>
                       <p className="text-gray-600 dark:text-gray-300 text-sm">
-                        {booking.car?.title || 'No title available'}
+                        {booking.carId?.title || 'No title available'}
                       </p>
                     </div>
-                    <Badge 
+                    <Badge
                       className={`${
                         booking.status === 'Confirmed' ? 'bg-green-500' :
                         booking.status === 'Pending' ? 'bg-yellow-500' :
+                        booking.status === 'Booked' ? 'bg-purple-500' :
                         booking.status === 'Completed' ? 'bg-blue-500' :
-                        'bg-red-500'
+                        booking.status === 'Sold' ? 'bg-red-500' :
+                        booking.status === 'Cancelled' ? 'bg-gray-500' :
+                        'bg-gray-500'
                       }`}
                     >
                       {booking.status}
@@ -177,36 +205,45 @@ export default function UserBookingsPage() {
                     <div className="flex items-center text-gray-600 dark:text-gray-300">
                       <Car className="h-4 w-4 mr-2" />
                       <span className="font-medium">
-                        {booking.car?.price ? formatPrice(booking.car.price) : 'Price not available'}
+                        {booking.carId?.price ? formatPrice(booking.carId.price) : 'Price not available'}
                       </span>
                     </div>
-                    
+
                     <div className="flex items-center text-gray-600 dark:text-gray-300">
                       <MapPin className="h-4 w-4 mr-2 flex-shrink-0" />
                       <span className="truncate">
-                        {booking.car?.roomid ? 'Showroom location available' : 'Location not specified'}
+                        {booking.roomId?.location || 'Location not specified'}
                       </span>
                     </div>
-                    
+
                     <div className="flex items-center text-gray-600 dark:text-gray-300">
                       <Phone className="h-4 w-4 mr-2" />
-                      <span>Phone information not provided</span>
+                      <span>{booking.bookingDetails?.phone || 'Phone not provided'}</span>
                     </div>
-                    
-                    <div className="pt-3 flex justify-between items-center">
+
+                    <div className="pt-3 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
                       <div className="text-sm text-gray-500 dark:text-gray-400">
                         <Calendar className="h-4 w-4 inline mr-1" />
-                        {new Date(booking.created_at).toLocaleDateString()}
+                        {new Date(booking.createdAt).toLocaleDateString()}
                       </div>
-                      <Link href={booking.car?.id ? `/chat/${booking.car.id}` : '#'}>
-                        {!booking.car?.id && (
-                          <span className="sr-only">Chat not available</span>
+                      <div className="flex flex-wrap gap-2 justify-end">
+                        {booking.carId?.id && booking.status === 'Pending' && (
+                          <Link href={`/payment/${booking.id}`}>
+                            <Button size="sm" className="bg-green-600 hover:bg-green-700">
+                              <span className="hidden sm:inline">Make Payment</span>
+                              <span className="sm:hidden">Pay</span>
+                            </Button>
+                          </Link>
                         )}
-                        <Button size="sm" variant="outline">
-                          <MessageCircle className="h-4 w-4 mr-2" />
-                          Chat with dealer
-                        </Button>
-                      </Link>
+                        {booking.carId?.id && (
+                          <Link href={`/chat/${booking.carId.id}`}>
+                            <Button size="sm" variant="outline">
+                              <MessageCircle className="h-4 w-4 mr-2" />
+                              Chat with dealer
+                            </Button>
+                          </Link>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </CardContent>

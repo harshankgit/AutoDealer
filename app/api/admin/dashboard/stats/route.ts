@@ -38,11 +38,11 @@ export async function GET(request: Request) {
       const soldCars = cars.filter(car => car.availability === 'Sold').length;
 
       // Count booking stats
-      const confirmedBookingsCount = bookings.filter(booking => booking.status === 'Confirmed').length;
-      const pendingBookingsCount = bookings.filter(booking => booking.status === 'Pending').length;
+      const confirmedBookingsCount = bookings.filter(booking => booking.status === 'Confirmed' || booking.status === 'Sold').length;
+      const pendingBookingsCount = bookings.filter(booking => booking.status === 'Pending' || booking.status === 'Booked').length;
 
       // Calculate revenue from confirmed bookings
-      const confirmedBookings = bookings.filter(booking => booking.status === 'Confirmed');
+      const confirmedBookings = bookings.filter(booking => booking.status === 'Confirmed' || booking.status === 'Sold');
       const totalRevenue = confirmedBookings.reduce((sum, booking) => sum + (booking.total_price || 0), 0);
 
       // Get total views for all of the admin's cars efficiently
@@ -79,11 +79,11 @@ export async function GET(request: Request) {
       const soldCars = cars.filter(car => car.availability === 'Sold').length;
 
       const totalBookings = bookings.length;
-      const confirmedBookingsCount = bookings.filter(booking => booking.status === 'Confirmed').length;
-      const pendingBookingsCount = bookings.filter(booking => booking.status === 'Pending').length;
+      const confirmedBookingsCount = bookings.filter(booking => booking.status === 'Confirmed' || booking.status === 'Sold').length;
+      const pendingBookingsCount = bookings.filter(booking => booking.status === 'Pending' || booking.status === 'Booked').length;
 
       // Calculate revenue from confirmed bookings
-      const confirmedBookings = bookings.filter(booking => booking.status === 'Confirmed');
+      const confirmedBookings = bookings.filter(booking => booking.status === 'Confirmed' || booking.status === 'Sold');
       const totalRevenue = confirmedBookings.reduce((sum, booking) => sum + (booking.total_price || 0), 0);
 
       // Get total views for all cars on the platform efficiently

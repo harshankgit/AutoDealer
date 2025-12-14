@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
-interface User {
+export interface User {
   id: string;
   username: string;
   email: string;
@@ -11,6 +11,7 @@ interface User {
   phone?: string;
   location?: string;
   profile_image?: string;
+  scanner_image?: string;
   created_at?: string;
   last_login?: string;
 }

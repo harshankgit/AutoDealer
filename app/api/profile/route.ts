@@ -39,6 +39,7 @@ export async function GET(request: Request) {
         phone,
         location,
         profile_image,
+        scanner_image,
         role,
         created_at,
         updated_at,
@@ -64,6 +65,7 @@ export async function GET(request: Request) {
         phone: userData.phone || null,
         location: userData.location || null,
         profile_image: userData.profile_image || null,
+        scanner_image: userData.scanner_image || null,
         role: userData.role || 'user',
         created_at: userData.created_at,
       }
@@ -121,6 +123,7 @@ export async function PUT(request: Request) {
         phone,
         location,
         profile_image,
+        scanner_image,
         role,
         created_at,
         last_login
@@ -142,6 +145,7 @@ export async function PUT(request: Request) {
         phone: userData.phone || null,
         location: userData.location || null,
         profile_image: userData.profile_image || null,
+        scanner_image: userData.scanner_image || null,
         role: userData.role || 'user',
         created_at: userData.created_at,
         last_login: userData.last_login || 'N/A',
@@ -263,7 +267,7 @@ export async function POST(request: Request) {
     // Fetch updated user data
     const { data: userData, error: userError } = await getSupabaseServiceRole()
       .from('users')
-      .select('id, username, email, phone, location, profile_image, role, created_at, last_login')
+      .select('id, username, email, phone, location, profile_image, scanner_image, role, created_at, last_login')
       .eq('id', userId)
       .single();
 
@@ -281,6 +285,7 @@ export async function POST(request: Request) {
         phone: userData.phone || null,
         location: userData.location || null,
         profile_image: userData.profile_image || null,
+        scanner_image: userData.scanner_image || null,
         role: userData.role || 'user',
         created_at: userData.created_at,
         last_login: userData.last_login || 'N/A',

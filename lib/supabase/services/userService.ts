@@ -10,6 +10,7 @@ export interface User {
   password?: string;
   role: string;
   favorites?: string[]; // Array of car IDs
+  scanner_image?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -32,7 +33,8 @@ export const userServices = {
             email: userData.email,
             password: hashedPassword,
             role: userData.role || 'user',
-            favorites: userData.favorites || []
+            favorites: userData.favorites || [],
+            scanner_image: userData.scanner_image || null
           }
         ])
         .select()
@@ -115,6 +117,28 @@ export const userServices = {
       return data as User;
     } catch (error) {
       console.error('Error in updateUserFavorites:', error);
+      return null;
+    }
+  },
+
+  // Update user scanner image
+  async updateUserScannerImage(userId: string, scannerImage: string | null): Promise<User | null> {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .update({ scanner_image: scannerImage })
+        .eq('id', userId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error updating user scanner image:', error);
+        return null;
+      }
+
+      return data as User;
+    } catch (error) {
+      console.error('Error in updateUserScannerImage:', error);
       return null;
     }
   },

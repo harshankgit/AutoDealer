@@ -84,7 +84,7 @@ export async function PUT(request: Request) {
     }
 
     // Validate status
-    const validStatuses = ['Pending', 'Confirmed', 'Completed', 'Cancelled'];
+    const validStatuses = ['Pending', 'Booked', 'Confirmed', 'Completed', 'Sold', 'Cancelled'];
     if (!validStatuses.includes(status)) {
       return NextResponse.json(
         { error: `Invalid status. Valid statuses are: ${validStatuses.join(', ')}` },
@@ -104,7 +104,30 @@ export async function PUT(request: Request) {
     // If it's a regular admin, ensure they own the room for this booking
     if (decoded.role === 'admin') {
       const adminRoom = await roomServices.getRoomByadminid(decoded.userId);
-      if (!adminRoom || booking.roomid !== adminRoom.id) {
+      if (!adminRoom) {
+        return NextResponse.json(
+          { error: 'Admin room not found' },
+          { status: 404 }
+        );
+      }
+
+      // Check if the booking's car belongs to the admin's room
+      // First get the car for this booking
+      const { supabase } = await import('@/lib/supabase/client');
+      const { data: carData, error: carError } = await supabase
+        .from('cars')
+        .select('roomid')
+        .eq('id', booking.carid)
+        .single();
+
+      if (carError || !carData) {
+        return NextResponse.json(
+          { error: 'Car for this booking not found' },
+          { status: 404 }
+        );
+      }
+
+      if (carData.roomid !== adminRoom.id) {
         return NextResponse.json(
           { error: 'Unauthorized - This booking does not belong to your room' },
           { status: 403 }

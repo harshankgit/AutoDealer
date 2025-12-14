@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Car, Home, BarChart3, MessageCircle, Settings, Loader2, Trash2, Bell, Calendar, Phone, Mail } from 'lucide-react';
+import { Plus, Car, Home, BarChart3, MessageCircle, Settings, Loader2, Trash2, Bell, Calendar, Phone, Mail, CreditCard } from 'lucide-react';
 import Link from 'next/link';
 import { useUser } from '@/context/user-context';
 import useRealtimeNotifications from '@/hooks/useRealtimeNotifications';
@@ -132,6 +132,13 @@ export default function AdminDashboard() {
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [paymentStats, setPaymentStats] = useState({
+    total: 0,
+    pending: 0,
+    approved: 0,
+    rejected: 0,
+  });
+  const [recentPayments, setRecentPayments] = useState<any[]>([]);
   const router = useRouter();
   const { user, loading } = useUser(); // Use context instead of local state
   const { notifications, unreadCount, addNotification, markAsRead, markAllAsRead } = useRealtimeNotifications();
@@ -260,6 +267,38 @@ export default function AdminDashboard() {
               }
             });
           }
+
+          // Fetch payment data
+          try {
+            const paymentResponse = await fetch('/api/admin/payments', {
+              headers: { 'Authorization': `Bearer ${user?.token}` },
+            });
+
+            if (paymentResponse.ok) {
+              const paymentData = await paymentResponse.json();
+              const payments = paymentData.payments || [];
+
+              // Calculate payment stats
+              const total = payments.length;
+              const pending = payments.filter((p: any) => p.payment_status === 'pending').length;
+              const approved = payments.filter((p: any) => p.payment_status === 'approved').length;
+              const rejected = payments.filter((p: any) => p.payment_status === 'rejected').length;
+
+              setPaymentStats({
+                total,
+                pending,
+                approved,
+                rejected,
+              });
+
+              // Set recent payments (last 5)
+              setRecentPayments(payments.slice(0, 5));
+            }
+          } catch (paymentError) {
+            console.error('Error fetching payment data:', paymentError);
+            // Don't let payment errors break the whole page
+          }
+
           setChartLoading(false);
         }
       }
@@ -432,12 +471,13 @@ export default function AdminDashboard() {
           /* Dashboard with Room */
           <Tabs defaultValue="overview" className="space-y-6">
             <div className="w-full overflow-x-auto -mx-4 px-4">
-              <TabsList className="flex w-max min-w-full sm:w-full sm:grid sm:grid-cols-5 sm:mx-0 sm:px-0">
+              <TabsList className="flex w-max min-w-full sm:w-full sm:grid sm:grid-cols-6 sm:mx-0 sm:px-0">
                 <TabsTrigger value="overview" className="text-xs sm:text-sm px-3 py-2 min-w-[80px] whitespace-nowrap">Overview</TabsTrigger>
                 <TabsTrigger value="cars" className="text-xs sm:text-sm px-3 py-2 min-w-[80px] whitespace-nowrap">Cars</TabsTrigger>
                 <TabsTrigger value="room" className="text-xs sm:text-sm px-3 py-2 min-w-[80px] whitespace-nowrap">Showroom</TabsTrigger>
                 <TabsTrigger value="notifications" className="text-xs sm:text-sm px-3 py-2 min-w-[80px] whitespace-nowrap">Notifications</TabsTrigger>
                 <TabsTrigger value="messages" className="text-xs sm:text-sm px-3 py-2 min-w-[80px] whitespace-nowrap">Messages</TabsTrigger>
+                <TabsTrigger value="payments" className="text-xs sm:text-sm px-3 py-2 min-w-[80px] whitespace-nowrap">Payments</TabsTrigger>
               </TabsList>
             </div>
 
@@ -506,7 +546,7 @@ export default function AdminDashboard() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-3">
                     <Link href="/admin/add-car">
                       <Button className="w-full h-20 flex flex-col items-center justify-center bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800">
                         <Plus className="h-6 w-6 mb-1" />
@@ -529,6 +569,12 @@ export default function AdminDashboard() {
                       <Button variant="outline" className="w-full h-20 flex flex-col items-center justify-center">
                         <Calendar className="h-6 w-6 mb-1" />
                         <span className="text-xs">Bookings</span>
+                      </Button>
+                    </Link>
+                    <Link href="/admin/payments">
+                      <Button variant="outline" className="w-full h-20 flex flex-col items-center justify-center">
+                        <CreditCard className="h-6 w-6 mb-1" />
+                        <span className="text-xs">Payments</span>
                       </Button>
                     </Link>
                   </div>
@@ -924,7 +970,9 @@ export default function AdminDashboard() {
                             </div>
                             <span className={`text-xs font-medium ${
                               booking.status === 'Confirmed' ? 'bg-green-100 text-green-800 dark:bg-green-800/30 dark:text-green-400' :
+                              booking.status === 'Sold' ? 'bg-green-100 text-green-800 dark:bg-green-800/30 dark:text-green-400' :
                               booking.status === 'Pending' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-800/30 dark:text-yellow-400' :
+                              booking.status === 'Booked' ? 'bg-purple-100 text-purple-800 dark:bg-purple-800/30 dark:text-purple-400' :
                               booking.status === 'Completed' ? 'bg-blue-100 text-blue-800 dark:bg-blue-800/30 dark:text-blue-400' :
                               'bg-red-100 text-red-800 dark:bg-red-800/30 dark:text-red-400'
                             } px-2 py-1 rounded-full`}>
@@ -1019,7 +1067,9 @@ export default function AdminDashboard() {
                           <td className="px-4 py-3 whitespace-nowrap">
                             <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                               booking.status === 'Confirmed' ? 'bg-green-100 text-green-800 dark:bg-green-800/30 dark:text-green-400' :
+                              booking.status === 'Sold' ? 'bg-green-100 text-green-800 dark:bg-green-800/30 dark:text-green-400' :
                               booking.status === 'Pending' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-800/30 dark:text-yellow-400' :
+                              booking.status === 'Booked' ? 'bg-purple-100 text-purple-800 dark:bg-purple-800/30 dark:text-purple-400' :
                               booking.status === 'Completed' ? 'bg-blue-100 text-blue-800 dark:bg-blue-800/30 dark:text-blue-400' :
                               'bg-red-100 text-red-800 dark:bg-red-800/30 dark:text-red-400'
                             }`}>
@@ -1204,6 +1254,94 @@ export default function AdminDashboard() {
                 </div>
               )}
             </TabsContent>
+
+            <TabsContent value="payments" className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Payment Management</h2>
+                <Link href="/admin/payments">
+                  <Button variant="outline" className="bg-blue-600 hover:bg-blue-700 text-white">
+                    View All Payments
+                  </Button>
+                </Link>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <Card className="bg-blue-50 dark:bg-blue-950/30 p-4 rounded-lg">
+                  <CardContent className="p-2">
+                    <div className="text-2xl font-bold" id="totalPayments">{paymentStats.total}</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">Total Payments</div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-yellow-50 dark:bg-yellow-950/30 p-4 rounded-lg">
+                  <CardContent className="p-2">
+                    <div className="text-2xl font-bold" id="pendingPayments">{paymentStats.pending}</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">Pending</div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-green-50 dark:bg-green-950/30 p-4 rounded-lg">
+                  <CardContent className="p-2">
+                    <div className="text-2xl font-bold" id="approvedPayments">{paymentStats.approved}</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">Approved</div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-red-50 dark:bg-red-950/30 p-4 rounded-lg">
+                  <CardContent className="p-2">
+                    <div className="text-2xl font-bold" id="rejectedPayments">{paymentStats.rejected}</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">Rejected</div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Recent Payment Requests</CardTitle>
+                  <CardDescription>
+                    Latest payment requests from customers
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4" id="recentPaymentsList">
+                    {recentPayments.length > 0 ? (
+                      recentPayments.map((payment: any) => (
+                        <div
+                          key={payment.id}
+                          className="flex flex-col sm:flex-row sm:justify-between sm:items-center p-4 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
+                        >
+                          <div className="mb-2 sm:mb-0">
+                            <h4 className="font-medium text-gray-900 dark:text-white flex items-center">
+                              <span className="mr-2">{payment.car?.title || 'N/A'}</span>
+                            </h4>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                              {payment.user?.username || 'N/A'} • {new Date(payment.created_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <div className="flex items-center space-x-4">
+                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                              payment.payment_status === 'approved' ? 'bg-green-100 text-green-800 dark:bg-green-800/30 dark:text-green-400' :
+                              payment.payment_status === 'rejected' ? 'bg-red-100 text-red-800 dark:bg-red-800/30 dark:text-red-400' :
+                              payment.payment_status === 'pending' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-800/30 dark:text-yellow-400' :
+                              'bg-blue-100 text-blue-800 dark:bg-blue-800/30 dark:text-blue-400'
+                            }`}>
+                              {payment.payment_status?.charAt(0).toUpperCase() + payment.payment_status?.slice(1) || 'Unknown'}
+                            </span>
+                            <p className="font-medium">₹{payment.amount?.toLocaleString() || '0'}</p>
+                            <Link href={`/admin/payments/${payment.id}`}>
+                              <Button variant="outline" size="sm">
+                                View Details
+                              </Button>
+                            </Link>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-gray-500 dark:text-gray-400 text-center py-8">
+                        No recent payment requests
+                      </p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
           </Tabs>
         )}
       </div>
@@ -1228,8 +1366,10 @@ export default function AdminDashboard() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Pending">Pending</SelectItem>
+                  <SelectItem value="Booked">Booked</SelectItem>
                   <SelectItem value="Confirmed">Confirmed</SelectItem>
                   <SelectItem value="Completed">Completed</SelectItem>
+                  <SelectItem value="Sold">Sold</SelectItem>
                   <SelectItem value="Cancelled">Cancelled</SelectItem>
                 </SelectContent>
               </Select>

@@ -24,10 +24,12 @@ import {
   Shield,
   Car,
   Heart,
-  FileText
+  FileText,
+  Download
 } from 'lucide-react';
 import { useUser } from '@/context/user-context';
 import { toast } from 'sonner';
+import AdminScannerTab from '@/components/admin/AdminScannerTab';
 
 interface BookingStats {
   total: number;
@@ -44,7 +46,7 @@ interface Booking {
   room_name: string;
   customer_name?: string; // Only for admin bookings
   booking_date: string;
-  status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
+  status: 'Pending' | 'Booked' | 'Confirmed' | 'Completed' | 'Sold' | 'Cancelled';
   total_amount: number;
 }
 
@@ -57,9 +59,12 @@ export default function ProfilePage() {
   const [location, setLocation] = useState('');
   const [profileImage, setProfileImage] = useState<File | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [scannerImage, setScannerImage] = useState<File | null>(null);
+  const [previewScannerImage, setPreviewScannerImage] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [bookingStats, setBookingStats] = useState<BookingStats | null>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
@@ -70,9 +75,11 @@ export default function ProfilePage() {
     fetchUserData();
     if (user?.role === 'admin') {
       fetchAdminStats();
+      fetchAdminPayments();
     } else {
       fetchBookingStats();
       fetchBookings();
+      fetchUserPayments();
     }
   }, [user]);
 
@@ -101,6 +108,11 @@ export default function ProfilePage() {
         setPhone(userData.phone || '');
         setLocation(userData.location || '');
         setPreviewImage(userData.profile_image || null);
+
+        // Set scanner image if user is an admin
+        if (user?.role === 'admin' || user?.role === 'superadmin') {
+          setPreviewScannerImage(userData.scanner_image || null);
+        }
       } else {
         const errorData = await response.json();
         console.error('Error fetching user data:', errorData.error || 'Failed to fetch user data');
@@ -194,9 +206,9 @@ export default function ProfilePage() {
 
         // Calculate stats from bookings
         const total = bookings.length;
-        const upcoming = bookings.filter((b: any) => b.status === 'pending').length;
-        const completed = bookings.filter((b: any) => b.status === 'completed').length;
-        const cancelled = bookings.filter((b: any) => b.status === 'cancelled').length;
+        const upcoming = bookings.filter((b: any) => b.status === 'Pending' || b.status === 'Booked').length;
+        const completed = bookings.filter((b: any) => b.status === 'Completed' || b.status === 'Sold').length;
+        const cancelled = bookings.filter((b: any) => b.status === 'Cancelled').length;
 
         setBookingStats({
           total,
@@ -318,6 +330,62 @@ export default function ProfilePage() {
     }
   };
 
+  // Handle scanner image change
+  const handleScannerImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setScannerImage(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreviewScannerImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Handle scanner image upload
+  const handleScannerImageUpload = async () => {
+    if (!scannerImage || !user) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        router.push('/login');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('scannerImage', scannerImage);
+
+      const response = await fetch('/api/admin/scanner', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to upload scanner image');
+      }
+
+      const data = await response.json();
+      const updatedUser = data.user;
+
+      // Update user context with new data
+      if (updateUser) {
+        updateUser(updatedUser);
+      }
+
+      toast.success('Scanner image updated successfully');
+      setScannerImage(null); // Reset the scanner image state
+    } catch (error) {
+      console.error('Error uploading scanner image:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to update scanner image');
+    }
+  };
+
   const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -419,6 +487,100 @@ export default function ProfilePage() {
     }
   };
 
+  const fetchUserPayments = async () => {
+    if (!user) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        router.push('/login');
+        return;
+      }
+
+      const response = await fetch('/api/payments', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const userPayments = data.payments || [];
+
+        // Update payment stats based on payments
+        const total = userPayments.length;
+        const pending = userPayments.filter((p: any) => p.payment_status === 'pending').length;
+        const approved = userPayments.filter((p: any) => p.payment_status === 'approved').length;
+        const rejected = userPayments.filter((p: any) => p.payment_status === 'rejected').length;
+
+        // Update the bookingStats to also account for payment stats by updating them
+        setBookingStats(prev => prev ? {
+          ...prev,
+          total: total,
+          upcoming: pending,
+          completed: approved,
+          cancelled: rejected
+        } : {
+          total,
+          upcoming: pending,
+          completed: approved,
+          cancelled: rejected
+        });
+
+        setPayments(userPayments);
+      }
+    } catch (error) {
+      console.error('Error fetching user payments:', error);
+    }
+  };
+
+  const fetchAdminPayments = async () => {
+    if (!user) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        router.push('/login');
+        return;
+      }
+
+      const response = await fetch('/api/payments', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const adminPayments = data.payments || [];
+
+        // For admin, update stats based on all payments
+        const total = adminPayments.length;
+        const pending = adminPayments.filter((p: any) => p.payment_status === 'pending').length;
+        const approved = adminPayments.filter((p: any) => p.payment_status === 'approved').length;
+        const rejected = adminPayments.filter((p: any) => p.payment_status === 'rejected').length;
+
+        // Update the bookingStats for admin
+        setBookingStats(prev => prev ? {
+          ...prev,
+          total,
+          upcoming: pending,
+          completed: approved,
+          cancelled: rejected
+        } : {
+          total,
+          upcoming: pending,
+          completed: approved,
+          cancelled: rejected
+        });
+
+        setPayments(adminPayments);
+      }
+    } catch (error) {
+      console.error('Error fetching admin payments:', error);
+    }
+  };
+
   if (!user) {
     return (
       <div className="container mx-auto py-8 px-4">
@@ -497,10 +659,16 @@ export default function ProfilePage() {
 
         <Tabs defaultValue="overview" className="space-y-6">
           <div className="w-full overflow-x-auto pb-2">
-            <TabsList className="w-max grid grid-flow-col grid-cols-4 gap-1">
+            <TabsList className="w-max grid grid-flow-col grid-cols-4 sm:grid-cols-5 gap-1">
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="profile">Profile</TabsTrigger>
               <TabsTrigger value="bookings">Bookings</TabsTrigger>
+              {user?.role === 'admin' || user?.role === 'superadmin' ? (
+                <>
+                  <TabsTrigger value="payments">Payments</TabsTrigger>
+                  <TabsTrigger value="scanner">Scanner</TabsTrigger>
+                </>
+              ) : null}
               <TabsTrigger value="security">Security</TabsTrigger>
             </TabsList>
           </div>
@@ -756,9 +924,11 @@ export default function ProfilePage() {
                         <div className="flex items-center space-x-4">
                           <Badge
                             variant={
-                              booking.status === 'completed' ? 'default' :
-                              booking.status === 'pending' ? 'secondary' :
-                              booking.status === 'confirmed' ? 'outline' :
+                              booking.status === 'Completed' ? 'default' :
+                              booking.status === 'Sold' ? 'default' :
+                              booking.status === 'Pending' ? 'secondary' :
+                              booking.status === 'Booked' ? 'secondary' :
+                              booking.status === 'Confirmed' ? 'outline' :
                               'destructive'
                             }
                           >
@@ -999,9 +1169,11 @@ export default function ProfilePage() {
                           <div className="flex items-center space-x-4">
                             <Badge
                               variant={
-                                carBooking.status === 'completed' ? 'default' :
-                                carBooking.status === 'pending' ? 'secondary' :
-                                carBooking.status === 'confirmed' ? 'outline' :
+                                carBooking.status === 'Completed' ? 'default' :
+                                carBooking.status === 'Sold' ? 'default' :
+                                carBooking.status === 'Pending' ? 'secondary' :
+                                carBooking.status === 'Booked' ? 'secondary' :
+                                carBooking.status === 'Confirmed' ? 'outline' :
                                 'destructive'
                               }
                             >
@@ -1049,9 +1221,11 @@ export default function ProfilePage() {
                         <div className="flex items-center space-x-4">
                           <Badge
                             variant={
-                              booking.status === 'completed' ? 'default' :
-                              booking.status === 'pending' ? 'secondary' :
-                              booking.status === 'confirmed' ? 'outline' :
+                              booking.status === 'Completed' ? 'default' :
+                              booking.status === 'Sold' ? 'default' :
+                              booking.status === 'Pending' ? 'secondary' :
+                              booking.status === 'Booked' ? 'secondary' :
+                              booking.status === 'Confirmed' ? 'outline' :
                               'destructive'
                             }
                           >
@@ -1322,6 +1496,250 @@ export default function ProfilePage() {
               </Card>
             )}
           </TabsContent>
+
+          {user?.role === 'admin' || user?.role === 'superadmin' ? (
+          <TabsContent value="payments" className="space-y-6">
+            <Card className="bg-white dark:bg-gray-800">
+              <CardHeader>
+                <CardTitle className="dark:text-white">Payments Management</CardTitle>
+                <CardDescription className="dark:text-gray-300">
+                  View and manage payment requests from customers
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <div className="animate-pulse space-y-4">
+                    <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/4 mb-4"></div>
+                    <div className="space-y-3">
+                      {[...Array(3)].map((_, i) => (
+                        <div key={i} className="flex justify-between items-center p-4 border rounded-lg">
+                          <div>
+                            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-2"></div>
+                            <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+                          </div>
+                          <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                      <div className="bg-blue-50 dark:bg-blue-950/30 p-4 rounded-lg">
+                        <div className="text-2xl font-bold" id="totalPayments">{bookingStats?.total || 0}</div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">Total Payments</div>
+                      </div>
+                      <div className="bg-yellow-50 dark:bg-yellow-950/30 p-4 rounded-lg">
+                        <div className="text-2xl font-bold" id="pendingPayments">{bookingStats?.upcoming || 0}</div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">Pending</div>
+                      </div>
+                      <div className="bg-green-50 dark:bg-green-950/30 p-4 rounded-lg">
+                        <div className="text-2xl font-bold" id="approvedPayments">{bookingStats?.completed || 0}</div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">Approved</div>
+                      </div>
+                      <div className="bg-red-50 dark:bg-red-950/30 p-4 rounded-lg">
+                        <div className="text-2xl font-bold" id="rejectedPayments">{bookingStats?.cancelled || 0}</div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">Rejected</div>
+                      </div>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <thead className="bg-gray-50 dark:bg-gray-700">
+                          <tr>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Car</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Customer</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Amount</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700" id="paymentsTableBody">
+                          {payments.length > 0 ? (
+                            payments.map((payment: any) => (
+                              <tr key={payment.id}>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                    {payment.car?.title || 'N/A'}
+                                  </div>
+                                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                                    {payment.car?.brand} {payment.car?.model}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm text-gray-900 dark:text-white">
+                                    {payment.user?.username || 'N/A'}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                  ₹{payment.amount?.toLocaleString() || '0'}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                    payment.payment_status === 'approved' ? 'bg-green-100 text-green-800 dark:bg-green-800/30 dark:text-green-400' :
+                                    payment.payment_status === 'rejected' ? 'bg-red-100 text-red-800 dark:bg-red-800/30 dark:text-red-400' :
+                                    payment.payment_status === 'pending' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-800/30 dark:text-yellow-400' :
+                                    'bg-blue-100 text-blue-800 dark:bg-blue-800/30 dark:text-blue-400'
+                                  }`}>
+                                    {payment.payment_status?.charAt(0).toUpperCase() + payment.payment_status?.slice(1) || 'Unknown'}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                  {new Date(payment.created_at).toLocaleDateString()}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => router.push(`/admin/payments/${payment.id}`)}
+                                  >
+                                    View Details
+                                  </Button>
+                                </td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan={6} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                                No payments found
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+          ) : (
+            // User Payment Tab
+            <TabsContent value="payments" className="space-y-6">
+              <Card className="bg-white dark:bg-gray-800">
+                <CardHeader>
+                  <CardTitle className="dark:text-white">My Payments</CardTitle>
+                  <CardDescription className="dark:text-gray-300">
+                    View the status of your payment requests
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {loading ? (
+                    <div className="animate-pulse space-y-4">
+                      <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/4 mb-4"></div>
+                      <div className="space-y-3">
+                        {[...Array(3)].map((_, i) => (
+                          <div key={i} className="flex justify-between items-center p-4 border rounded-lg">
+                            <div>
+                              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-2"></div>
+                              <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+                            </div>
+                            <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                        <div className="bg-blue-50 dark:bg-blue-950/30 p-4 rounded-lg">
+                          <div className="text-2xl font-bold">{bookingStats?.total || 0}</div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400">Total Payments</div>
+                        </div>
+                        <div className="bg-yellow-50 dark:bg-yellow-950/30 p-4 rounded-lg">
+                          <div className="text-2xl font-bold">{bookingStats?.upcoming || 0}</div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400">Pending</div>
+                        </div>
+                        <div className="bg-green-50 dark:bg-green-950/30 p-4 rounded-lg">
+                          <div className="text-2xl font-bold">{bookingStats?.completed || 0}</div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400">Approved</div>
+                        </div>
+                        <div className="bg-red-50 dark:bg-red-950/30 p-4 rounded-lg">
+                          <div className="text-2xl font-bold">{bookingStats?.cancelled || 0}</div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400">Rejected</div>
+                        </div>
+                      </div>
+
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                          <thead className="bg-gray-50 dark:bg-gray-700">
+                            <tr>
+                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Car</th>
+                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Amount</th>
+                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date</th>
+                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                            {payments.length > 0 ? (
+                              payments.map((payment: any) => (
+                                <tr key={payment.id}>
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                      {payment.car?.title || 'N/A'}
+                                    </div>
+                                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                                      {payment.car?.brand} {payment.car?.model}
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                    ₹{payment.amount?.toLocaleString() || '0'}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                      payment.payment_status === 'approved' ? 'bg-green-100 text-green-800 dark:bg-green-800/30 dark:text-green-400' :
+                                      payment.payment_status === 'rejected' ? 'bg-red-100 text-red-800 dark:bg-red-800/30 dark:text-red-400' :
+                                      payment.payment_status === 'pending' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-800/30 dark:text-yellow-400' :
+                                      'bg-blue-100 text-blue-800 dark:bg-blue-800/30 dark:text-blue-400'
+                                    }`}>
+                                      {payment.payment_status?.charAt(0).toUpperCase() + payment.payment_status?.slice(1) || 'Unknown'}
+                                    </span>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                    {new Date(payment.created_at).toLocaleDateString()}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => router.push(`/profile/payments/${payment.id}`)}
+                                    >
+                                      View Details
+                                    </Button>
+                                  </td>
+                                </tr>
+                              ))
+                            ) : (
+                              <tr>
+                                <td colSpan={5} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                                  No payments found
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+
+          {/* Admin Scanner Tab - Only for admins */}
+          {user?.role === 'admin' || user?.role === 'superadmin' ? (
+            <TabsContent value="scanner" className="space-y-6">
+              <AdminScannerTab
+                user={user}
+                scannerImage={scannerImage}
+                previewScannerImage={previewScannerImage}
+                handleScannerImageChange={handleScannerImageChange}
+                handleScannerImageUpload={handleScannerImageUpload}
+              />
+            </TabsContent>
+          ) : null}
         </Tabs>
       </div>
     </div>

@@ -218,6 +218,191 @@ export const otpServices = {
     }
   },
 
+  // Generate and send OTP for specific action (e.g., scanner upload)
+  async generateAndSendOTP(email: string, action: string): Promise<{ success: boolean; message: string }> {
+    try {
+      console.log(`Sending ${action} OTP to email:`, email);
+
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return { success: false, message: 'Invalid email format' };
+      }
+
+      // Generate a new OTP
+      const otpCode = generateOTP();
+      const expiresAt = new Date();
+      expiresAt.setMinutes(expiresAt.getMinutes() + 10); // OTP expires in 10 minutes
+
+      // First, remove any existing unused OTPs for this email and action
+      const { error: deleteError } = await getSupabaseServiceRole()
+        .from('otps')
+        .delete()
+        .eq('email', email)
+        .eq('action', action); // Add action filter
+
+      if (deleteError) {
+        console.error('Error deleting existing OTPs:', deleteError);
+        return { success: false, message: `Database error during cleanup: ${deleteError.message}` };
+      }
+
+      // Create new OTP entry
+      const { data, error } = await getSupabaseServiceRole()
+        .from('otps')
+        .insert({
+          email,
+          otp_code: otpCode,
+          expires_at: expiresAt.toISOString(),
+          used: false,
+          attempts: 0,
+          action: action // Add action field
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating OTP in database:', error);
+        return { success: false, message: `Database error: ${error.message}` };
+      }
+
+      // Configure email transporter
+      if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+        console.error('Email credentials not configured');
+        return { success: false, message: 'Email service not configured' };
+      }
+
+      const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS,
+        },
+      });
+
+      // Verify the transporter connection
+      try {
+        await transporter.verify();
+        console.log('Email transporter verified successfully');
+      } catch (connectionError) {
+        console.error('Email transporter connection failed:', connectionError);
+        return { success: false, message: 'Email service connection failed. Please contact administrators.' };
+      }
+
+      // Customize email based on action
+      let subject = 'Your OTP Code - CarSelling Platform';
+      let description = 'for verification';
+
+      if (action === 'scanner_upload') {
+        subject = 'Scanner Upload Verification OTP - CarSelling Platform';
+        description = 'for scanner upload verification';
+      }
+
+      // Send OTP email
+      const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: email,
+        subject: subject,
+        html: `
+          <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px;">
+            <div style="text-align: center; margin-bottom: 20px;">
+              <h1 style="color: #007bff;">CarSelling Platform</h1>
+              <p style="font-size: 18px; color: #555;">${action === 'scanner_upload' ? 'Scanner Upload' : 'Verification'} Verification</p>
+            </div>
+
+            <div style="background-color: #f0f8ff; padding: 15px; border-radius: 5px; margin-bottom: 20px; text-align: center;">
+              <h2 style="color: #007bff;">Your OTP Code</h2>
+              <div style="font-size: 32px; font-weight: bold; color: #007bff; letter-spacing: 5px; margin: 20px 0;">
+                ${otpCode}
+              </div>
+            </div>
+
+            <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+              <p style="font-size: 16px; margin-bottom: 10px;">Dear Admin,</p>
+              <p style="margin-bottom: 10px;">Your OTP for ${description} is: <strong>${otpCode}</strong></p>
+              <p>This OTP is valid for the next 10 minutes only. Please use it to complete the ${action === 'scanner_upload' ? 'scanner upload' : action} process.</p>
+            </div>
+
+            <div style="text-align: center; margin-top: 20px; font-size: 14px; color: #777;">
+              <p>This is an automated message, please do not reply to this email.</p>
+              <p>&copy; ${new Date().getFullYear()} CarSelling Platform. All rights reserved.</p>
+            </div>
+          </div>
+        `,
+      };
+
+      const info = await transporter.sendMail(mailOptions);
+      console.log('Email sent successfully, Message ID:', info.messageId);
+
+      return { success: true, message: 'OTP sent successfully to your email' };
+    } catch (error: any) {
+      console.error('Error in generateAndSendOTP service:', {
+        message: error?.message,
+        stack: error?.stack,
+        email,
+        action
+      });
+      return { success: false, message: 'Failed to send OTP. Please try again.' };
+    }
+  },
+
+  // Verify OTP for a specific action
+  async verifyOTPForAction(email: string, otpCode: string, action: string): Promise<{ success: boolean; message: string }> {
+    try {
+      console.log(`Verifying ${action} OTP for email:`, email);
+
+      // Check if OTP exists, is valid, and hasn't been used for this specific action
+      const { data: otpRecord, error } = await getSupabaseServiceRole()
+        .from('otps')
+        .select('*')
+        .eq('email', email)
+        .eq('otp_code', otpCode)
+        .eq('action', action) // Filter by action
+        .gte('expires_at', new Date().toISOString()) // Not expired
+        .eq('used', false) // Not used
+        .single();
+
+      if (error || !otpRecord) {
+        if (error?.code === 'PGRST116') { // No rows returned
+          // Record the failed attempt
+          await getSupabaseServiceRole()
+            .from('otps')
+            .update({ attempts: 1 })
+            .eq('email', email)
+            .eq('action', action) // Filter by action
+            .is('used', false); // Only update unused records
+
+          return { success: false, message: 'Invalid or expired OTP' };
+        }
+        console.error('Error checking OTP in database:', error);
+        return { success: false, message: 'Failed to verify OTP. Please try again.' };
+      }
+
+      // Mark the OTP as used in the database
+      const { error: updateError } = await getSupabaseServiceRole()
+        .from('otps')
+        .update({ used: true })
+        .eq('id', otpRecord.id);
+
+      if (updateError) {
+        console.error('Error updating OTP status:', updateError);
+        return { success: false, message: 'Failed to verify OTP. Please try again.' };
+      }
+
+      return {
+        success: true,
+        message: 'OTP verified successfully'
+      };
+    } catch (error: any) {
+      console.error('Error in verifyOTP service:', {
+        message: error?.message,
+        stack: error?.stack,
+        email,
+        action
+      });
+      return { success: false, message: 'Failed to verify OTP. Please try again.' };
+    }
+  },
+
   // Resend OTP for an email (if needed)
   async resendOTP(email: string): Promise<{ success: boolean; message: string }> {
     try {

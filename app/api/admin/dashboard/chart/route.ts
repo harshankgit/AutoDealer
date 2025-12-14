@@ -51,7 +51,7 @@ export async function GET(request: Request) {
         const month = new Date(booking.created_at).getMonth();
         monthlyData[month].bookings += 1;
 
-        if (booking.status === 'Confirmed') {
+        if (booking.status === 'Confirmed' || booking.status === 'Sold') {
           monthlyData[month].confirmedBookings += 1;
           monthlyData[month].revenue += booking.total_price;
         }
@@ -100,7 +100,7 @@ export async function GET(request: Request) {
         const month = new Date(booking.created_at).getMonth();
         monthlyData[month].bookings += 1;
         
-        if (booking.status === 'Confirmed') {
+        if (booking.status === 'Confirmed' || booking.status === 'Sold') {
           monthlyData[month].confirmedBookings += 1;
           monthlyData[month].revenue += booking.total_price;
         }

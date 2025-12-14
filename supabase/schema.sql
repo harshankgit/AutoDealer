@@ -22,6 +22,7 @@ CREATE TABLE users (
     password VARCHAR(255) NOT NULL,
     role VARCHAR(20) DEFAULT 'user',
     favorites TEXT[] DEFAULT '{}',
+    scanner_image TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -116,6 +117,13 @@ CREATE TABLE payments (
     status VARCHAR(20) NOT NULL DEFAULT 'pending',
     payment_method VARCHAR(50),
     transactionid VARCHAR(255),
+    payment_receipt_image TEXT,
+    payment_details JSONB,
+    admin_notes TEXT,
+    admin_scanner_image TEXT,
+    approved_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    approved_at TIMESTAMP WITH TIME ZONE,
+    expected_delivery_date DATE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -128,6 +136,7 @@ CREATE TABLE otps (
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
     used BOOLEAN DEFAULT FALSE,
     attempts INTEGER DEFAULT 0,
+    action VARCHAR(50) DEFAULT 'registration',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

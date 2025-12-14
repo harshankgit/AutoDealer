@@ -795,7 +795,9 @@ export default function SuperAdminDashboard() {
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                               booking.status === 'Confirmed' ? 'bg-green-100 text-green-800 dark:bg-green-800/30 dark:text-green-400' :
+                              booking.status === 'Sold' ? 'bg-green-100 text-green-800 dark:bg-green-800/30 dark:text-green-400' :
                               booking.status === 'Pending' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-800/30 dark:text-yellow-400' :
+                              booking.status === 'Booked' ? 'bg-purple-100 text-purple-800 dark:bg-purple-800/30 dark:text-purple-400' :
                               booking.status === 'Completed' ? 'bg-blue-100 text-blue-800 dark:bg-blue-800/30 dark:text-blue-400' :
                               'bg-red-100 text-red-800 dark:bg-red-800/30 dark:text-red-400'
                             }`}>
