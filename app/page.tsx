@@ -13,6 +13,7 @@ import LineChart from '@/components/charts/LineChart';
 import PieChart from '@/components/charts/PieChart';
 import dynamic from 'next/dynamic';
 import { LoadingLink } from '@/components/ui/LoadingLink';
+import ChatbotComponent from '@/components/chatbot/ChatbotComponent';
 
 interface HomePageStats {
   totalUsers: number;
@@ -592,5 +593,10 @@ export default function Home() {
     </div>
   );
 
-  return <FirstVisitAnimation>{content}</FirstVisitAnimation>;
+  return (
+    <>
+      <FirstVisitAnimation>{content}</FirstVisitAnimation>
+      <ChatbotComponent />
+    </>
+  );
 }
