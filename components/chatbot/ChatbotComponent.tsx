@@ -7,13 +7,14 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Bot, Send, User, X, MessageCircle, Globe } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { Bot, Send, User, X, MessageCircle, Globe } from 'lucide-react';
 import { chatbotService } from '@/lib/supabase/services/chatbotService';
 
 interface Message {
@@ -42,6 +43,7 @@ const ChatbotComponent = () => {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [askedQuestionIds, setAskedQuestionIds] = useState<string[]>([]);
+  const [selectedQuestion, setSelectedQuestion] = useState<ChatbotQA | null>(null);
 
   // Load questions
   useEffect(() => {
@@ -103,10 +105,10 @@ const ChatbotComponent = () => {
     // Add user message
     setMessages(prev => [
       ...prev,
-      {
-        id: 'u-' + q.id,
-        type: 'user',
-        text: language === 'en' ? q.question_en : q.question_hi
+      { 
+        id: 'u-' + q.id, 
+        type: 'user', 
+        text: language === 'en' ? q.question_en : q.question_hi 
       }
     ]);
 
@@ -114,10 +116,10 @@ const ChatbotComponent = () => {
     setTimeout(() => {
       setMessages(prev => [
         ...prev,
-        {
-          id: 'a-' + q.id,
-          type: 'bot',
-          text: language === 'en' ? q.answer_en : q.answer_hi
+        { 
+          id: 'a-' + q.id, 
+          type: 'bot', 
+          text: language === 'en' ? q.answer_en : q.answer_hi 
         }
       ]);
     }, 400);
@@ -185,10 +187,19 @@ const ChatbotComponent = () => {
 
       {/* Chat Window - Only render when open */}
       {isOpen && (
-        <div className="fixed bottom-24 right-6 z-50 w-full max-w-md h-[70vh] flex flex-col">
+        <div
+          className="
+            fixed z-50
+            inset-x-2 bottom-20
+            sm:right-6 sm:left-auto
+            w-[calc(100%-1rem)] sm:w-[380px]
+            h-[85vh] sm:h-[60vh]
+            flex flex-col
+          "
+        >
           {/* Chat Header */}
           <Card className="flex-1 flex flex-col border rounded-lg shadow-xl overflow-hidden h-full">
-            <CardHeader className="p-4 bg-muted text-foreground flex flex-row items-center justify-between">
+            <CardHeader className="p-4 bg-muted text-foreground flex flex-row items-center justify-between sticky top-0 z-10">
               <CardTitle className="text-lg flex items-center gap-2">
                 <Bot className="h-5 w-5" />
                 {language === 'en' ? 'Support Assistant' : 'सहायता सहायक'}
@@ -239,7 +250,7 @@ const ChatbotComponent = () => {
 
             <CardContent className="p-0 flex-1 flex flex-col h-[calc(100%-60px)]">
               {/* Messages Area */}
-              <ScrollArea className="flex-1 p-4">
+              <ScrollArea className="flex-1 px-3 py-2">
                 <div className="space-y-4">
                   {messages.map((m) => (
                     <div
@@ -247,7 +258,7 @@ const ChatbotComponent = () => {
                       className={`flex ${m.type === 'user' ? 'justify-end' : 'justify-start'}`}
                     >
                       <div
-                        className={`max-w-[80%] rounded-lg p-3 ${
+                        className={`max-w-[90%] sm:max-w-[80%] rounded-lg p-3 ${
                           m.type === 'user'
                             ? 'bg-primary text-primary-foreground rounded-br-none'
                             : 'bg-muted text-foreground rounded-bl-none'
@@ -296,7 +307,7 @@ const ChatbotComponent = () => {
               </ScrollArea>
 
               {/* Question buttons */}
-              <div className="p-3 border-t bg-background flex flex-wrap gap-2 max-h-32 overflow-y-auto">
+              <div className="p-3 border-t bg-background flex flex-wrap gap-2 max-h-40 sm:max-h-32 overflow-y-auto">
                 <TooltipProvider>
                   {questions.map((q) => (
                     <Tooltip key={q.id}>
@@ -304,9 +315,19 @@ const ChatbotComponent = () => {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => onQuestionSelect(q)}
+                          onClick={() => {
+                            if (!askedQuestionIds.includes(q.id)) {
+                              onQuestionSelect(q);
+                            }
+                          }}
+                          onContextMenu={(e) => {
+                            e.preventDefault();
+                            if (!askedQuestionIds.includes(q.id)) {
+                              setSelectedQuestion(q);
+                            }
+                          }}
                           disabled={askedQuestionIds.includes(q.id)}
-                          className={`flex-1 min-w-[45%] text-left h-auto py-2 ${askedQuestionIds.includes(q.id) ? 'opacity-50' : ''}`}
+                          className={`w-full sm:w-[48%] text-left h-auto py-3 ${askedQuestionIds.includes(q.id) ? 'opacity-50' : ''}`}
                         >
                           <div className="truncate w-full">
                             {language === 'en' ? q.question_en : q.question_hi}
@@ -326,26 +347,61 @@ const ChatbotComponent = () => {
                 </TooltipProvider>
               </div>
 
-              {/* Input Area */}
-              <div className="p-3 border-t bg-background flex gap-2">
-                <Input
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  placeholder={
-                    language === 'en' 
-                      ? 'Ask a question...' 
-                      : 'एक प्रश्न पूछें...'
-                  }
-                  onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                  className="flex-1"
-                />
-                <Button onClick={handleSendMessage} disabled={!inputValue.trim()}>
-                  <Send className="h-4 w-4" />
-                </Button>
-              </div>
+              {/* Input Area - Hide text input for cleaner bot-only experience */}
+              {false && (
+                <div className="p-3 border-t bg-background flex gap-2 sticky bottom-0">
+                  <Input
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    placeholder={
+                      language === 'en'
+                        ? 'Ask a question...'
+                        : 'एक प्रश्न पूछें...'
+                    }
+                    onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                    className="flex-1 text-base"
+                  />
+                  <Button onClick={handleSendMessage} disabled={!inputValue.trim()}>
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
-        
+          
+          {/* Question Detail Modal for Mobile */}
+          <Dialog open={!!selectedQuestion} onOpenChange={() => setSelectedQuestion(null)}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle className="text-lg">
+                  {language === 'en' ? 'Question' : 'प्रश्न'}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="py-2">
+                <p className="text-base">
+                  {selectedQuestion && (language === 'en' ? selectedQuestion.question_en : selectedQuestion.question_hi)}
+                </p>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setSelectedQuestion(null)}
+                >
+                  {language === 'en' ? 'Cancel' : 'रद्द करें'}
+                </Button>
+                <Button 
+                  onClick={() => {
+                    if (selectedQuestion) {
+                      onQuestionSelect(selectedQuestion);
+                      setSelectedQuestion(null);
+                    }
+                  }}
+                >
+                  {language === 'en' ? 'Select' : 'चुनें'}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       )}
     </>

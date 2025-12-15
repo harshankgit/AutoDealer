@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Users, Home, Car, BarChart3, Settings, Loader2, Trash2, Edit, Eye, MessageCircle } from 'lucide-react';
+import { Users, Home, Car, BarChart3, Settings, Loader2, Trash2, Edit, Eye, MessageCircle, Bot } from 'lucide-react';
 import Link from 'next/link';
 import { useUser } from '@/context/user-context';
 import { AdminDashboardSkeleton } from '@/components/skeletons/AdminDashboardSkeleton';
@@ -387,16 +387,19 @@ export default function SuperAdminDashboard() {
         )}
 
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-7">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="users">Users</TabsTrigger>
-            <TabsTrigger value="showrooms">Showrooms</TabsTrigger>
-            <TabsTrigger value="cars">Cars</TabsTrigger>
-            <TabsTrigger value="bookings">Bookings</TabsTrigger>
-            <TabsTrigger value="payments">Payments</TabsTrigger>
-            <TabsTrigger value="chats">Chats</TabsTrigger>
-            <TabsTrigger value="settings">Settings</TabsTrigger>
-          </TabsList>
+          <div className="w-full overflow-x-auto">
+            <TabsList className="flex flex-wrap justify-start w-max min-w-full sm:w-auto sm:min-w-0 sm:justify-between sm:grid sm:grid-cols-9">
+              <TabsTrigger value="overview" className="text-xs sm:text-sm px-2 py-1 sm:px-3 sm:py-2 whitespace-nowrap">Overview</TabsTrigger>
+              <TabsTrigger value="users" className="text-xs sm:text-sm px-2 py-1 sm:px-3 sm:py-2 whitespace-nowrap">Users</TabsTrigger>
+              <TabsTrigger value="showrooms" className="text-xs sm:text-sm px-2 py-1 sm:px-3 sm:py-2 whitespace-nowrap">Showrooms</TabsTrigger>
+              <TabsTrigger value="cars" className="text-xs sm:text-sm px-2 py-1 sm:px-3 sm:py-2 whitespace-nowrap">Cars</TabsTrigger>
+              <TabsTrigger value="bookings" className="text-xs sm:text-sm px-2 py-1 sm:px-3 sm:py-2 whitespace-nowrap">Bookings</TabsTrigger>
+              <TabsTrigger value="payments" className="text-xs sm:text-sm px-2 py-1 sm:px-3 sm:py-2 whitespace-nowrap">Payments</TabsTrigger>
+              <TabsTrigger value="chats" className="text-xs sm:text-sm px-2 py-1 sm:px-3 sm:py-2 whitespace-nowrap">Chats</TabsTrigger>
+              <TabsTrigger value="chatbot" className="text-xs sm:text-sm px-2 py-1 sm:px-3 sm:py-2 whitespace-nowrap">Chatbot</TabsTrigger>
+              <TabsTrigger value="settings" className="text-xs sm:text-sm px-2 py-1 sm:px-3 sm:py-2 whitespace-nowrap">Settings</TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="overview" className="space-y-6">
             {/* Stats Cards */}
@@ -933,6 +936,80 @@ export default function SuperAdminDashboard() {
                       </Button>
                     </div>
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+          <TabsContent value="chatbot" className="space-y-6">
+            <Card className="bg-white dark:bg-gray-800">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 dark:text-white">
+                  <Bot className="h-5 w-5" />
+                  Chatbot Management
+                </CardTitle>
+                <CardDescription className="dark:text-gray-300">
+                  Manage chatbot questions, answers, and settings
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <Link href="/admin/chatbot">
+                    <Card className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer border-2 border-transparent hover:border-blue-500">
+                      <CardContent className="p-6 flex flex-col items-center text-center">
+                        <Bot className="h-10 w-10 mb-3 text-blue-500" />
+                        <h3 className="font-semibold text-lg dark:text-white">Manage Questions & Answers</h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                          Add, edit, and organize chatbot Q&A pairs
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                  <div className="bg-gray-50 dark:bg-gray-700 p-6 rounded-lg">
+                    <h3 className="font-semibold text-lg dark:text-white mb-2">Quick Stats</h3>
+                    <ul className="text-sm text-gray-600 dark:text-gray-300 space-y-1">
+                      <li className="flex justify-between">
+                        <span>Total Questions:</span>
+                        <span className="font-medium">0</span>
+                      </li>
+                      <li className="flex justify-between">
+                        <span>Active Questions:</span>
+                        <span className="font-medium">0</span>
+                      </li>
+                      <li className="flex justify-between">
+                        <span>Response Rate:</span>
+                        <span className="font-medium">0%</span>
+                      </li>
+                    </ul>
+                  </div>
+                  <div className="bg-gray-50 dark:bg-gray-700 p-6 rounded-lg">
+                    <h3 className="font-semibold text-lg dark:text-white mb-2">Languages</h3>
+                    <ul className="text-sm text-gray-600 dark:text-gray-300 space-y-1">
+                      <li className="flex justify-between">
+                        <span>English:</span>
+                        <span className="font-medium">✓</span>
+                      </li>
+                      <li className="flex justify-between">
+                        <span>Hindi:</span>
+                        <span className="font-medium">✓</span>
+                      </li>
+                      <li className="flex justify-between">
+                        <span>Other:</span>
+                        <span className="font-medium">-</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <h4 className="font-medium text-blue-800 dark:text-blue-200 mb-2">Chatbot Management</h4>
+                  <p className="text-blue-700 dark:text-blue-300 text-sm mb-3">
+                    Use this section to manage all chatbot questions and answers. You can create bilingual Q&A pairs,
+                    organize them by category, and set their priority levels.
+                  </p>
+                  <Link href="/admin/chatbot">
+                    <Button className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800">
+                      Manage Chatbot Content
+                    </Button>
+                  </Link>
                 </div>
               </CardContent>
             </Card>
