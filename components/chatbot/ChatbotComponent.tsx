@@ -69,12 +69,12 @@ const ChatbotComponent = () => {
       // Add error message to chat
       setMessages(prev => [
         ...prev,
-        { 
-          id: 'error-' + Date.now(), 
-          type: 'bot', 
-          text: language === 'en' 
-            ? 'Sorry, I could not load the questions. Please try again later.' 
-            : 'क्षमा करें, प्रश्न लोड नहीं किए जा सके। बाद में पुनः प्रयास करें।' 
+        {
+          id: 'error-' + Date.now(),
+          type: 'bot',
+          text: language === 'en'
+            ? 'Sorry, I could not load the questions. Please try again later.'
+            : 'क्षमा करें, प्रश्न लोड नहीं किए जा सके। बाद में पुनः प्रयास करें।'
         }
       ]);
     } finally {
@@ -85,18 +85,19 @@ const ChatbotComponent = () => {
   const startChat = (lang: 'en' | 'hi') => {
     setLanguage(lang);
     setMessages([]);
-    
+    setAskedQuestionIds([]); // Reset all question states when switching language
+
     // Add initial greeting
     setMessages([
-      { 
-        id: 'initial-' + Date.now(), 
-        type: 'bot', 
-        text: lang === 'en' 
-          ? 'Hello! How can I assist you today?' 
-          : 'नमस्ते! आज मैं आपकी कैसे सहायता कर सकता हूँ?' 
+      {
+        id: 'initial-' + Date.now(),
+        type: 'bot',
+        text: lang === 'en'
+          ? 'Hello! How can I assist you today?'
+          : 'नमस्ते! आज मैं आपकी कैसे सहायता कर सकता हूँ?'
       }
     ]);
-    
+
     // Load questions for selected language
     loadQuestions();
   };
@@ -105,10 +106,10 @@ const ChatbotComponent = () => {
     // Add user message
     setMessages(prev => [
       ...prev,
-      { 
-        id: 'u-' + q.id, 
-        type: 'user', 
-        text: language === 'en' ? q.question_en : q.question_hi 
+      {
+        id: 'u-' + q.id,
+        type: 'user',
+        text: language === 'en' ? q.question_en : q.question_hi
       }
     ]);
 
@@ -116,10 +117,10 @@ const ChatbotComponent = () => {
     setTimeout(() => {
       setMessages(prev => [
         ...prev,
-        { 
-          id: 'a-' + q.id, 
-          type: 'bot', 
-          text: language === 'en' ? q.answer_en : q.answer_hi 
+        {
+          id: 'a-' + q.id,
+          type: 'bot',
+          text: language === 'en' ? q.answer_en : q.answer_hi
         }
       ]);
     }, 400);
@@ -134,10 +135,10 @@ const ChatbotComponent = () => {
     // Add user message
     setMessages(prev => [
       ...prev,
-      { 
-        id: 'usr-' + Date.now(), 
-        type: 'user', 
-        text: inputValue 
+      {
+        id: 'usr-' + Date.now(),
+        type: 'user',
+        text: inputValue
       }
     ]);
 
@@ -145,12 +146,12 @@ const ChatbotComponent = () => {
     setTimeout(() => {
       setMessages(prev => [
         ...prev,
-        { 
-          id: 'bot-' + Date.now(), 
-          type: 'bot', 
-          text: language === 'en' 
-            ? 'I am a chatbot and can only respond to predefined questions. Please select a question from the list below.' 
-            : 'मैं एक चैटबॉट हूं और केवल पूर्वनिर्धारित प्रश्नों का ही उत्तर दे सकता हूं। कृपया नीचे दी गई सूची से एक प्रश्न का चयन करें।' 
+        {
+          id: 'bot-' + Date.now(),
+          type: 'bot',
+          text: language === 'en'
+            ? 'I am a chatbot and can only respond to predefined questions. Please select a question from the list below.'
+            : 'मैं एक चैटबॉट हूं और केवल पूर्वनिर्धारित प्रश्नों का ही उत्तर दे सकता हूं। कृपया नीचे दी गई सूची से एक प्रश्न का चयन करें।'
         }
       ]);
     }, 400);
@@ -368,7 +369,7 @@ const ChatbotComponent = () => {
               )}
             </CardContent>
           </Card>
-          
+
           {/* Question Detail Modal for Mobile */}
           <Dialog open={!!selectedQuestion} onOpenChange={() => setSelectedQuestion(null)}>
             <DialogContent className="sm:max-w-md">
@@ -383,13 +384,13 @@ const ChatbotComponent = () => {
                 </p>
               </div>
               <div className="flex justify-end gap-2">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={() => setSelectedQuestion(null)}
                 >
                   {language === 'en' ? 'Cancel' : 'रद्द करें'}
                 </Button>
-                <Button 
+                <Button
                   onClick={() => {
                     if (selectedQuestion) {
                       onQuestionSelect(selectedQuestion);
