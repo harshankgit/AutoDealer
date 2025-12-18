@@ -18,6 +18,7 @@ export async function POST(req: Request) {
     // Parse the form data
     const formData = await req.formData();
     const file = formData.get('scannerImage') as File | null;
+    const formUserId = formData.get('userId') as string | null;
 
     if (!file) {
       return NextResponse.json(
@@ -26,10 +27,38 @@ export async function POST(req: Request) {
       );
     }
 
+    // Use form userId if provided, otherwise use the one from the token (for admin uploads)
+    const userId = formUserId || decoded?.userId;
+
+    if (!userId) {
+      console.error('User ID is required. Form data keys:', Array.from(formData.keys()));
+      // Include the form data keys in the error for debugging
+      return NextResponse.json(
+        {
+          error: 'User ID is required. Please include "userId" field in form data or use a valid admin token.',
+          receivedFormDataKeys: Array.from(formData.keys()),
+          exampleUsage: 'Form data should contain "scannerImage" and "userId" fields, or use a token with user ID'
+        },
+        { status: 400 }
+      );
+    }
+
+    // Verify that the user exists
+    const user = await userServices.getUserById(userId);
+    if (!user) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      );
+    }
+
+    // Upload the image to Supabase storage
     const supabase = getSupabaseServiceRole();
     const fileBuffer = await file.arrayBuffer();
-    const fileName = `scanner/${decoded.userId}/${Date.now()}-${file.name.replace(/\s+/g, '_')}`;
+    const fileName = `${Date.now()}-${userId}-${file.name}`;
 
+    // First, verify if the bucket exists by attempting to upload
+    // Note: You need to create the 'scanner-uploads' bucket in your Supabase dashboard first
     const { data, error } = await supabase
       .storage
       .from('scanner-uploads')
@@ -40,81 +69,52 @@ export async function POST(req: Request) {
 
     if (error) {
       console.error('Error uploading scanner image:', error);
+      // Check if this is a bucket not found error by checking the error message
+      if (error.name === 'HttpError' && (error as any).status === 404) {
+        return NextResponse.json(
+          { error: 'Storage bucket not found. Please create a bucket named "scanner-uploads" in your Supabase dashboard.' },
+          { status: 400 }
+        );
+      }
       return NextResponse.json(
-        { error: 'Failed to upload scanner image to storage' },
+        { error: 'Failed to upload scanner image: ' + error.message },
         { status: 500 }
       );
     }
 
-    const publicUrl = supabase.storage
+    // Get the public URL for the uploaded image
+    const { data: urlData } = supabase
+      .storage
       .from('scanner-uploads')
-      .getPublicUrl(fileName).data.publicUrl;
-
-    if (!publicUrl) {
+      .getPublicUrl(fileName);
+      
+    if (!urlData?.publicUrl) {
       return NextResponse.json(
-        { error: 'Failed to get public URL for uploaded image' },
+        { error: 'Failed to generate public URL for scanner image' },
         { status: 500 }
       );
     }
 
-    // Update the user's scanner image
-    const updateResult = await userServices.updateUserScannerImage(decoded.userId, publicUrl);
-
-    if (!updateResult) {
+    // Update the user's scanner_image field in the database
+    const updatedUser = await userServices.updateUserScannerImage(userId, urlData.publicUrl);
+    
+    if (!updatedUser) {
+      // Clean up the uploaded file if DB update fails
+      await supabase.storage.from('scanner-uploads').remove([fileName]);
       return NextResponse.json(
-        { error: 'Failed to update user scanner image' },
+        { error: 'Failed to update user with scanner image' },
         { status: 500 }
       );
     }
-
-    // Fetch the complete user data to return a full user object
-    const supabaseClient = getSupabaseServiceRole();
-    const { data: userData, error: userError } = await supabaseClient
-      .from('users')
-      .select(`
-        id,
-        username,
-        email,
-        phone,
-        location,
-        profile_image,
-        scanner_image,
-        role,
-        created_at,
-        last_login
-      `)
-      .eq('id', decoded.userId)
-      .single();
-
-    if (userError || !userData) {
-      console.error('Error fetching updated user data:', userError);
-      return NextResponse.json(
-        { error: 'Failed to fetch updated user data' },
-        { status: 500 }
-      );
-    }
-
-    const userForContext = {
-      id: userData.id,
-      username: userData.username,
-      email: userData.email,
-      role: userData.role,
-      phone: userData.phone || undefined,
-      location: userData.location || undefined,
-      profile_image: userData.profile_image || undefined,
-      scanner_image: userData.scanner_image || undefined,
-      created_at: userData.created_at,
-      last_login: userData.last_login || undefined
-    };
 
     return NextResponse.json({
-      message: 'Scanner image uploaded and updated successfully',
-      scannerImageUrl: publicUrl,
-      user: userForContext
+      message: 'Scanner image uploaded and linked to user successfully',
+      scannerImageUrl: urlData.publicUrl,
+      userId: updatedUser.id
     }, { status: 200 });
 
   } catch (error: any) {
-    console.error('Upload user scanner image error:', error);
+    console.error('Upload scanner image error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }
@@ -122,6 +122,7 @@ export async function POST(req: Request) {
   }
 }
 
+// Allow GET requests to fetch a user's scanner image
 export async function GET(req: Request) {
   try {
     const token = req.headers.get('authorization')?.replace('Bearer ', '');
@@ -134,9 +135,18 @@ export async function GET(req: Request) {
       );
     }
 
-    // Get the user's scanner image
-    const user = await userServices.getUserById(decoded.userId);
-    
+    const { searchParams } = new URL(req.url);
+    const userId = searchParams.get('userId');
+
+    if (!userId) {
+      console.error('User ID is required for GET request');
+      return NextResponse.json(
+        { error: 'User ID is required' },
+        { status: 400 }
+      );
+    }
+
+    const user = await userServices.getUserById(userId);
     if (!user) {
       return NextResponse.json(
         { error: 'User not found' },
@@ -145,22 +155,11 @@ export async function GET(req: Request) {
     }
 
     return NextResponse.json({
-      scannerImageUrl: user.scanner_image,
-      user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-        favorites: user.favorites,
-        scanner_image: user.scanner_image || undefined,
-        created_at: user.created_at,
-        updated_at: user.updated_at
-      },
-      message: 'Scanner image retrieved successfully'
+      userId: user.id,
+      scannerImageUrl: user.scanner_image
     }, { status: 200 });
-
   } catch (error: any) {
-    console.error('Get user scanner image error:', error);
+    console.error('Get scanner image error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }

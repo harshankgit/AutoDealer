@@ -102,7 +102,7 @@ export const userServices = {
   // Update user favorites
   async updateUserFavorites(userId: string, favorites: string[]): Promise<User | null> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await getSupabaseServiceRole()
         .from('users')
         .update({ favorites })
         .eq('id', userId)
@@ -124,7 +124,7 @@ export const userServices = {
   // Update user scanner image
   async updateUserScannerImage(userId: string, scannerImage: string | null): Promise<User | null> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await getSupabaseServiceRole()
         .from('users')
         .update({ scanner_image: scannerImage })
         .eq('id', userId)
@@ -166,7 +166,7 @@ export const userServices = {
   // Update user role
   async updateUserRole(userId: string, role: string): Promise<User | null> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await getSupabaseServiceRole()
         .from('users')
         .update({ role })
         .eq('id', userId)
@@ -188,7 +188,7 @@ export const userServices = {
   // Delete user
   async deleteUser(userId: string): Promise<boolean> {
     try {
-      const { error } = await supabase
+      const { error } = await getSupabaseServiceRole()
         .from('users')
         .delete()
         .eq('id', userId);

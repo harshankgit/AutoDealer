@@ -90,7 +90,7 @@ export default function UserBookingsPage() {
       setIsLoading(true);
       const response = await fetch('/api/user/bookings', {
         headers: {
-          'Authorization': `Bearer ${user?.token}`,
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
       });
 
@@ -227,7 +227,7 @@ export default function UserBookingsPage() {
                         {new Date(booking.createdAt).toLocaleDateString()}
                       </div>
                       <div className="flex flex-wrap gap-2 justify-end">
-                        {booking.carId?.id && booking.status === 'Pending' && (
+                        {booking.carId?.id && ['Pending', 'Booked', 'Confirmed'].includes(booking.status) && (
                           <Link href={`/payment/${booking.id}`}>
                             <Button size="sm" className="bg-green-600 hover:bg-green-700">
                               <span className="hidden sm:inline">Make Payment</span>

@@ -69,7 +69,8 @@ export default function AdminPaymentsPage() {
   const [otp, setOtp] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [otpVerified, setOtpVerified] = useState(false);
-  const [otpAction, setOtpAction] = useState<'upload_general' | 'upload_payment' | null>(null);
+  const [otpAction, setOtpAction] = useState<'upload_general' | 'upload_payment' | 'upload_user' | null>(null);
+  const [uploadUserId, setUploadUserId] = useState<string | null>(null); // For user-specific uploads
 
   const [stats, setStats] = useState({
     total: 0,
@@ -265,7 +266,7 @@ export default function AdminPaymentsPage() {
     }
   };
 
-  const sendOtp = async (action: 'upload_general' | 'upload_payment') => {
+  const sendOtp = async (action: 'upload_general' | 'upload_payment' | 'upload_user', userId?: string) => {
     try {
       setIsSendingOtp(true);
       const token = localStorage.getItem('token');
@@ -289,8 +290,12 @@ export default function AdminPaymentsPage() {
 
       // Set the action that will be performed after OTP verification
       setOtpAction(action);
+      if (userId) {
+        setUploadUserId(userId);
+      }
       setOtpVerified(false);
       setOtp('');
+      setShowScannerConfirmModal(false); // Close confirmation modal before showing verification modal
       setShowOtpModal(true);
       toast.success('OTP sent to your email. Please check your inbox.');
     } catch (error) {
@@ -335,7 +340,7 @@ export default function AdminPaymentsPage() {
         toast.success('OTP verified successfully!');
 
         // Perform the original action based on otpAction
-        if (otpAction === 'upload_general' || otpAction === 'upload_payment') {
+        if (otpAction === 'upload_general' || otpAction === 'upload_payment' || otpAction === 'upload_user') {
           // Close OTP modal and open scanner upload modal
           setShowScannerUploadModal(true);
         }
@@ -362,7 +367,7 @@ export default function AdminPaymentsPage() {
         return;
       }
 
-      // If selectedPayment is null, it's a general upload, otherwise it's for a specific payment
+      // Handle different upload scenarios
       if (selectedPayment) {
         // Upload for specific payment
         const formData = new FormData();
@@ -411,8 +416,32 @@ export default function AdminPaymentsPage() {
         ));
 
         setSelectedPayment(null);
+      } else if (uploadUserId) {
+        // Upload for specific user
+        const formData = new FormData();
+        formData.append('scannerImage', scannerImage);
+        formData.append('userId', uploadUserId);
+
+        const uploadResponse = await fetch('/api/admin/scanner', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+          body: formData,
+        });
+
+        if (!uploadResponse.ok) {
+          const uploadError = await uploadResponse.json();
+          throw new Error(uploadError.error || 'Failed to upload scanner image for user');
+        }
+
+        const result = await uploadResponse.json();
+        toast.success('Scanner image uploaded and linked to user successfully');
+
+        // Reset the userId for user-specific uploads
+        setUploadUserId(null);
       } else {
-        // General upload (not tied to specific payment) - just upload the image
+        // General upload (not tied to specific payment or user) - just upload the image
         const formData = new FormData();
         formData.append('scannerImage', scannerImage);
 
@@ -458,6 +487,13 @@ export default function AdminPaymentsPage() {
     }
   };
 
+  // Function to trigger scanner upload for a specific user
+  const handleUploadScannerForUser = (userId: string) => {
+    setUploadUserId(userId);
+    setSelectedPayment(null); // Clear any selected payment
+    sendOtp('upload_user', userId);
+  };
+
   const filteredPayments = payments.filter(payment => {
     if (!searchTerm) return true;
 
@@ -493,12 +529,25 @@ export default function AdminPaymentsPage() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button
+            {/* <Button
               variant="outline"
               onClick={() => setShowScannerConfirmModal(true)}
             >
               <Upload className="h-4 w-4 mr-2" />
-              Upload Scanner
+              General Scanner
+            </Button> */}
+            <Button
+              variant="outline"
+              onClick={() => {
+                // Upload scanner for the currently logged-in admin user
+                setSelectedPayment(null); // Ensure no payment is selected
+                setUploadUserId(user?.id || null); // Use current user ID if available
+                setOtpAction('upload_user'); // Set the action type
+                setShowScannerConfirmModal(true); // Show confirmation modal
+              }}
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              My Scanner
             </Button>
             <Button onClick={() => router.back()} variant="outline">
               Back to Dashboard
@@ -679,6 +728,15 @@ export default function AdminPaymentsPage() {
                             >
                               <Eye className="h-4 w-4 mr-1" />
                               View
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleUploadScannerForUser(payment.user_id)}
+                              title="Upload scanner for this user"
+                            >
+                              <Upload className="h-4 w-4 mr-1" />
+                              User Scanner
                             </Button>
                             {payment.payment_status === 'pending' && (
                               <>
@@ -937,9 +995,16 @@ export default function AdminPaymentsPage() {
               onClick={() => {
                 // Clear selected payment to indicate general upload
                 setSelectedPayment(null);
-                sendOtp('upload_general');
-                setShowScannerConfirmModal(false);
+                if (otpAction === 'upload_user') {
+                  // For user upload, we already have the userId set
+                  sendOtp('upload_user', uploadUserId || undefined);
+                } else {
+                  setUploadUserId(null); // Ensure no specific user is selected for general upload
+                  sendOtp('upload_general');
+                }
+                // setShowScannerConfirmModal is now handled in sendOtp function after success
               }}
+              disabled={isSendingOtp}
             >
               {isSendingOtp ? (
                 <>
@@ -1031,9 +1096,19 @@ export default function AdminPaymentsPage() {
       <Dialog open={showScannerUploadModal} onOpenChange={setShowScannerUploadModal}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Upload Scanner Image</DialogTitle>
+            <DialogTitle>
+              {otpAction === 'upload_user'
+                ? 'Upload User Scanner Image'
+                : otpAction === 'upload_payment'
+                  ? 'Upload Payment Scanner Image'
+                  : 'Upload General Scanner Image'}
+            </DialogTitle>
             <DialogDescription>
-              Select and upload your scanner image. This will be stored in the database.
+              {otpAction === 'upload_user'
+                ? 'Select and upload a scanner image for the user. This will be stored in the user\'s profile.'
+                : otpAction === 'upload_payment'
+                  ? 'Select and upload a scanner image for the payment. This will be linked to the payment record.'
+                  : 'Select and upload a general scanner image. This will be stored for administrative purposes.'}
             </DialogDescription>
           </DialogHeader>
 

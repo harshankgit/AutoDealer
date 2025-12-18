@@ -32,7 +32,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
     const { supabase } = await import('@/lib/supabase/client');
     const { data: carData, error: carError } = await supabase
       .from('cars')
-      .select('*')
+      .select('*, rooms!inner(id, name, location)')
       .eq('id', booking.carid)
       .single();
 
@@ -45,6 +45,8 @@ export async function GET(request: Request, { params }: { params: { id: string }
     // Add car details to the booking
     const bookingWithCar = {
       ...booking,
+      // Include the roomid from the car data
+      roomid: carData?.roomid,
       car: carData
     };
 

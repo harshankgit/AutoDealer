@@ -19,6 +19,7 @@ import {
   Phone,
   Mail,
   Loader2,
+  CreditCard,
 } from "lucide-react";
 import {
   Dialog,
@@ -33,6 +34,17 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { CarDetailsSkeleton } from "@/components/skeletons/CarDetailsSkeleton";
 import { useUser } from "@/context/user-context";
+
+interface Booking {
+  id: string;
+  carid: string;
+  userid: string;
+  start_date: string;
+  end_date: string;
+  total_price: number;
+  status: string;
+  created_at: string;
+}
 
 interface Car {
   id: string;
@@ -97,10 +109,12 @@ export default function CarDetailsPage() {
   const [isFavorite, setIsFavorite] = useState(false);
   const [isBookingDialogOpen, setIsBookingDialogOpen] = useState(false);
   const [bookingPhoneNumber, setBookingPhoneNumber] = useState("");
+  const [bookingAmount, setBookingAmount] = useState("");
   const [bookingNotes, setBookingNotes] = useState("");
   const [isBookingLoading, setIsBookingLoading] = useState(false);
   const [bookingError, setBookingError] = useState("");
   const [bookingSuccess, setBookingSuccess] = useState(false);
+  const [activeBooking, setActiveBooking] = useState<Booking | null>(null);
   const { user } = useUser();
 
   useEffect(() => {
@@ -108,7 +122,43 @@ export default function CarDetailsPage() {
 
     fetchCar();
     checkIfFavorite();
+    fetchActiveBooking();
   }, [carId, user]);
+
+  const fetchActiveBooking = async () => {
+    if (!user || !carId) return;
+
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        router.push("/login");
+        return;
+      }
+
+      const response = await fetch(`/api/user/bookings`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const bookingsForThisCar = data.bookings?.filter((booking: Booking) =>
+          booking.carid === carId &&
+          booking.userid === user.id
+        ) || [];
+
+        // Find the booking with status 'Booked', 'Confirmed', or 'Pending'
+        const activeBooking = bookingsForThisCar.find((booking: Booking) =>
+          ['Pending', 'Booked', 'Confirmed'].includes(booking.status)
+        );
+
+        setActiveBooking(activeBooking || null);
+      }
+    } catch (error) {
+      console.error("Error fetching user bookings:", error);
+    }
+  };
 
   const checkIfFavorite = async () => {
     if (!carId || !user) return;
@@ -214,6 +264,13 @@ export default function CarDetailsPage() {
     setBookingError("");
     setBookingSuccess(false);
 
+    // Validate booking amount
+    if (bookingAmount && (isNaN(Number(bookingAmount)) || Number(bookingAmount) <= 0)) {
+      setBookingError("Please enter a valid booking amount");
+      setIsBookingLoading(false);
+      return;
+    }
+
     try {
       const response = await fetch("/api/bookings", {
         method: "POST",
@@ -226,6 +283,7 @@ export default function CarDetailsPage() {
           bookingDetails: {
             phone: bookingPhoneNumber,
             notes: bookingNotes,
+            bookingAmount: bookingAmount ? Number(bookingAmount) : undefined
           },
         }),
       });
@@ -459,6 +517,15 @@ export default function CarDetailsPage() {
                   Book Car
                 </Button>
               )}
+              {/* Show payment button only if user has an active booking for this car */}
+              {user && car.adminid && user.id !== car.adminid  && (
+                <Link href={`/payment/${car.id}`} className="flex-1">
+                  <Button className="w-full bg-purple-600 hover:bg-purple-700">
+                    <CreditCard className="h-4 w-4 mr-2" />
+                    Make Payment
+                  </Button>
+                </Link>
+              )}
             </div>
 
             {/* Booking Dialog */}
@@ -485,6 +552,19 @@ export default function CarDetailsPage() {
                       placeholder="e.g., +1234567890"
                       value={bookingPhoneNumber}
                       onChange={(e) => setBookingPhoneNumber(e.target.value)}
+                      className="col-span-3"
+                    />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="bookingAmount" className="text-right">
+                      Booking Amount
+                    </Label>
+                    <Input
+                      id="bookingAmount"
+                      type="number"
+                      placeholder="e.g., 50000"
+                      value={bookingAmount}
+                      onChange={(e) => setBookingAmount(e.target.value)}
                       className="col-span-3"
                     />
                   </div>
@@ -525,6 +605,33 @@ export default function CarDetailsPage() {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+
+            {/* Active Booking Info */}
+            {activeBooking && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 dark:bg-blue-900/20 dark:border-blue-800">
+                <div className="flex items-start">
+                  <div className="flex-shrink-0">
+                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center dark:bg-blue-800">
+                      <CreditCard className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                    </div>
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                      Active Booking
+                    </h3>
+                    <div className="mt-2 text-sm text-blue-700 dark:text-blue-300">
+                      <p>
+                        You have an active booking for this car. After negotiating the price with the dealer,
+                        you can proceed with payment using the "Make Payment" button.
+                      </p>
+                      <p className="mt-2 font-semibold">
+                        Booking Status: <span className="capitalize">{activeBooking.status}</span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Dealer Info */}
             <Card className="bg-card text-card-foreground">

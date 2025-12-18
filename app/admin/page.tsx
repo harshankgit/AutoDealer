@@ -5,15 +5,18 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Car, Home, BarChart3, MessageCircle, Settings, Loader2, Trash2, Bell, Calendar, Phone, Mail, CreditCard } from 'lucide-react';
+import { Plus, Car, Home, BarChart3, MessageCircle, Settings, Loader2, Trash2, Bell, Calendar, Phone, Mail, CreditCard, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { useUser } from '@/context/user-context';
 import useRealtimeNotifications from '@/hooks/useRealtimeNotifications';
 import NotificationBadge, { NotificationItem } from '@/components/ui/notification-badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import BackButton from '@/components/BackButton';
 import { AdminDashboardSkeleton } from '@/components/skeletons/AdminDashboardSkeleton';
+import { toast } from 'sonner';
 
 interface Room {
   id: string;
@@ -139,6 +142,19 @@ export default function AdminDashboard() {
     rejected: 0,
   });
   const [recentPayments, setRecentPayments] = useState<any[]>([]);
+  // OTP and Scanner Upload state
+  const [showScannerConfirmModal, setShowScannerConfirmModal] = useState(false);
+  const [showOtpModal, setShowOtpModal] = useState(false);
+  const [showScannerUploadModal, setShowScannerUploadModal] = useState(false);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [otp, setOtp] = useState('');
+  const [otpVerified, setOtpVerified] = useState(false);
+  const [otpAction, setOtpAction] = useState<'upload_general' | 'upload_payment' | 'upload_user' | null>(null);
+  const [scannerImage, setScannerImage] = useState<File | null>(null);
+  const [previewScannerImage, setPreviewScannerImage] = useState<string | null>(null);
+  const [uploadUserId, setUploadUserId] = useState<string | null>(null); // For user-specific uploads
   const router = useRouter();
   const { user, loading } = useUser(); // Use context instead of local state
   const { notifications, unreadCount, addNotification, markAsRead, markAllAsRead } = useRealtimeNotifications();
@@ -395,6 +411,179 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setScannerImage(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreviewScannerImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const sendOtp = async (action: 'upload_general' | 'upload_payment' | 'upload_user', userId?: string) => {
+    try {
+      setIsSendingOtp(true);
+      const token = localStorage.getItem('token');
+      if (!token) {
+        router.push('/login');
+        return;
+      }
+
+      const response = await fetch('/api/admin/verify-scanner-otp/send-otp', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to send OTP');
+      }
+
+      // Set the action that will be performed after OTP verification
+      setOtpAction(action);
+      if (userId) {
+        setUploadUserId(userId);
+      }
+      setOtpVerified(false);
+      setOtp('');
+      setShowScannerConfirmModal(false); // Close confirmation modal before showing verification modal
+      setShowOtpModal(true);
+      toast.success('OTP sent to your email. Please check your inbox.');
+    } catch (error) {
+      console.error('Error sending OTP:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to send OTP');
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
+  const verifyOtp = async () => {
+    if (!otp || otp.length !== 6) {
+      toast.error('Please enter a valid 6-digit OTP');
+      return;
+    }
+
+    try {
+      setIsVerifying(true);
+      const token = localStorage.getItem('token');
+      if (!token) {
+        router.push('/login');
+        return;
+      }
+
+      const response = await fetch('/api/admin/verify-scanner-otp/verify-otp', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ otp }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Invalid OTP');
+      }
+
+      const result = await response.json();
+      if (result.verified) {
+        setOtpVerified(true);
+        toast.success('OTP verified successfully!');
+
+        // Perform the original action based on otpAction
+        if (otpAction === 'upload_general' || otpAction === 'upload_payment' || otpAction === 'upload_user') {
+          // Close OTP modal and open scanner upload modal
+          setShowOtpModal(false);
+          setShowScannerUploadModal(true);
+        }
+      }
+    } catch (error) {
+      console.error('Error verifying OTP:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to verify OTP');
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const handleScannerUploadAfterVerification = async () => {
+    if (!scannerImage) {
+      toast.error('Please select a scanner image to upload');
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      const token = localStorage.getItem('token');
+      if (!token) {
+        router.push('/login');
+        return;
+      }
+
+      // Handle different upload scenarios
+      if (uploadUserId) {
+        // Upload for specific user
+        const formData = new FormData();
+        formData.append('scannerImage', scannerImage);
+        formData.append('userId', uploadUserId);
+
+        const uploadResponse = await fetch('/api/admin/scanner', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+          body: formData,
+        });
+
+        if (!uploadResponse.ok) {
+          const uploadError = await uploadResponse.json();
+          throw new Error(uploadError.error || 'Failed to upload scanner image for user');
+        }
+
+        const result = await uploadResponse.json();
+        toast.success('Scanner image uploaded and linked to user successfully');
+
+        // Reset the userId for user-specific uploads
+        setUploadUserId(null);
+      } else {
+        // General upload (not tied to specific payment or user) - just upload the image
+        const formData = new FormData();
+        formData.append('scannerImage', scannerImage);
+
+        const uploadResponse = await fetch('/api/admin/scanner', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+          body: formData,
+        });
+
+        if (!uploadResponse.ok) {
+          const uploadError = await uploadResponse.json();
+          throw new Error(uploadError.error || 'Failed to upload scanner image');
+        }
+
+        toast.success('General scanner image uploaded successfully');
+      }
+
+      // Reset state
+      setShowScannerUploadModal(false);
+      setScannerImage(null);
+      setPreviewScannerImage(null);
+      setOtpVerified(false);
+    } catch (error) {
+      console.error('Error uploading scanner image:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to upload scanner image');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   if (isLoading) {
     return <AdminDashboardSkeleton />;
   }
@@ -577,6 +766,19 @@ export default function AdminDashboard() {
                         <span className="text-xs">Payments</span>
                       </Button>
                     </Link>
+                    <Button
+                      variant="outline"
+                      className="w-full h-20 flex flex-col items-center justify-center"
+                      onClick={() => {
+                        // Upload scanner for the currently logged-in admin user
+                        setUploadUserId(user?.id || null); // Use current user ID if available
+                        setOtpAction('upload_user'); // Set the action type
+                        setShowScannerConfirmModal(true); // Show confirmation modal
+                      }}
+                    >
+                      <Upload className="h-6 w-6 mb-1" />
+                      <span className="text-xs">My Scanner</span>
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -1403,6 +1605,223 @@ export default function AdminDashboard() {
           <DialogFooter>
             <Button onClick={() => setIsSuccessModalOpen(false)}>
               OK
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Scanner Upload Confirmation Modal */}
+      <Dialog open={showScannerConfirmModal} onOpenChange={setShowScannerConfirmModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Upload Scanner Image</DialogTitle>
+            <DialogDescription>
+              Do you want to upload a scanner image? This will require OTP verification for security.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="flex justify-center">
+              <Upload className="h-16 w-16 text-gray-400" />
+            </div>
+            <p className="text-center text-sm text-gray-600 dark:text-gray-300">
+              After confirming, we'll send an OTP to your email for verification.
+            </p>
+          </div>
+
+          <DialogFooter className="flex sm:justify-between">
+            <Button
+              variant="outline"
+              onClick={() => setShowScannerConfirmModal(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                // For user upload, we already have the userId set
+                sendOtp('upload_user', uploadUserId || undefined);
+                // setShowScannerConfirmModal is now handled in sendOtp function after success
+              }}
+              disabled={isSendingOtp}
+            >
+              {isSendingOtp ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Sending OTP...
+                </>
+              ) : (
+                'Send OTP'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* OTP Verification Modal */}
+      <Dialog open={showOtpModal} onOpenChange={setShowOtpModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Verify Your Identity</DialogTitle>
+            <DialogDescription>
+              Enter the 6-digit OTP sent to your email to verify your identity before uploading scanner.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="otp">Enter OTP</Label>
+              <Input
+                id="otp"
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                placeholder="Enter 6-digit OTP"
+                className="text-center text-2xl tracking-widest"
+              />
+            </div>
+
+            <div className="text-sm text-gray-500 dark:text-gray-400">
+              <p>Please check your email for the OTP. Didn't receive it? Check spam folder or request again.</p>
+            </div>
+          </div>
+
+          <DialogFooter className="flex flex-col sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowOtpModal(false);
+                setOtp('');
+                setOtpVerified(false);
+              }}
+              disabled={isVerifying}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={verifyOtp}
+              disabled={isVerifying || otp.length !== 6}
+            >
+              {isVerifying ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Verifying...
+                </>
+              ) : (
+                'Verify OTP'
+              )}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => sendOtp(otpAction as 'upload_general' | 'upload_payment' | 'upload_user', uploadUserId || undefined)}
+              disabled={isSendingOtp}
+            >
+              {isSendingOtp ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Sending...
+                </>
+              ) : (
+                'Resend OTP'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Scanner Upload Modal - After OTP Verification */}
+      <Dialog open={showScannerUploadModal} onOpenChange={setShowScannerUploadModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {otpAction === 'upload_user'
+                ? 'Upload User Scanner Image'
+                : otpAction === 'upload_payment'
+                  ? 'Upload Payment Scanner Image'
+                  : 'Upload General Scanner Image'}
+            </DialogTitle>
+            <DialogDescription>
+              {otpAction === 'upload_user'
+                ? 'Select and upload a scanner image for the user. This will be stored in the user\'s profile.'
+                : otpAction === 'upload_payment'
+                  ? 'Select and upload a scanner image for the payment. This will be linked to the payment record.'
+                  : 'Select and upload a general scanner image. This will be stored for administrative purposes.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="scannerImageUpload">Select Scanner Image</Label>
+              <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-md">
+                <div className="space-y-1 text-center w-full">
+                  <Upload className="mx-auto h-12 w-12 text-gray-400" />
+                  <div className="flex text-sm text-gray-600 dark:text-gray-300">
+                    <label
+                      htmlFor="scannerImageUpload"
+                      className="relative cursor-pointer bg-white dark:bg-gray-700 rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none w-full"
+                    >
+                      <span className="w-full text-center block">Upload a scanner image</span>
+                      <Input
+                        id="scannerImageUpload"
+                        name="scannerImageUpload"
+                        type="file"
+                        accept="image/*"
+                        className="sr-only"
+                        onChange={handleImageChange}
+                      />
+                    </label>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    PNG, JPG, GIF up to 10MB
+                  </p>
+                </div>
+              </div>
+
+              {previewScannerImage && (
+                <div className="mt-4">
+                  <Label>Preview:</Label>
+                  <div className="mt-2 flex justify-center">
+                    <img
+                      src={previewScannerImage}
+                      alt="Scanner preview"
+                      className="max-w-full h-auto rounded border"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter className="flex sm:justify-between">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowScannerUploadModal(false);
+                setScannerImage(null);
+                setPreviewScannerImage(null);
+                // Close OTP modal as well when canceling scanner upload
+                setShowOtpModal(false);
+              }}
+              disabled={isProcessing}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleScannerUploadAfterVerification}
+              disabled={isProcessing || !scannerImage}
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload Scanner
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
