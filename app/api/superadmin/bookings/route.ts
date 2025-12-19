@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { NextResponse } from 'next/server';
 import { bookingServices } from '@/lib/supabase/services/bookingService';
 import { verifyToken } from '@/lib/auth';

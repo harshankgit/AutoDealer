@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { NextResponse } from 'next/server';
 import { getSupabaseServiceRole } from '@/lib/supabase/server';
 import { verifyToken } from '@/lib/auth';

@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { NextResponse } from 'next/server';
 import { roomServices } from '@/lib/supabase/services/generalServices';
 import { carServices } from '@/lib/supabase/services/carService';

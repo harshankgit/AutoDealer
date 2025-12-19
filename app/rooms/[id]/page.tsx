@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Car, Heart, MessageCircle, Search, Filter, Fuel, Calendar, Users, Eye, Loader2, Trash2, Edit, ArrowLeft, ChevronLeft, ChevronRight, X, Plus, Minus } from 'lucide-react';
+import { MapPin, Car, Heart, MessageCircle, Search, Filter, Fuel, Calendar, Users, Eye, Loader2, Trash2, Edit, ArrowLeft, ChevronLeft, ChevronRight, X, Plus, Minus, Youtube } from 'lucide-react';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -27,9 +27,9 @@ interface Car {
   year: number;
   price: number;
   mileage: number;
-  fuelType: string;
+  fuel_type: string;
   transmission: string;
-  ownershipHistory: string;
+  ownership_history: string;
   images: string[];
   description: string;
   condition: string;
@@ -47,7 +47,7 @@ interface Car {
     topSpeed?: string;
     features?: string[];
   };
-  createdAt: string;
+  created_at: string;
 }
 
 interface Room {
@@ -61,10 +61,11 @@ interface Room {
     username: string;
     email: string;
   } | null;
-  contactInfo: {
+  contact_info: {
     phone?: string;
     email?: string;
     address?: string;
+    username?: string;
   };
 }
 
@@ -95,9 +96,9 @@ export default function RoomDetailsPage() {
     year: 0,
     price: '',
     mileage: '',
-    fuelType: '',
+    fuelType: '',  // This is the form field name, keep as camelCase for consistency
     transmission: '',
-    ownershipHistory: '',
+    ownershipHistory: '', // This is the form field name, keep as camelCase for consistency
     images: '',
     description: '',
     condition: '',
@@ -193,6 +194,7 @@ export default function RoomDetailsPage() {
     }
 
     const carsData = await carsResponse.json();
+
     setCars(carsData.cars);
     setFilteredCars(carsData.cars);
   };
@@ -244,10 +246,10 @@ export default function RoomDetailsPage() {
       year: car.year,
       price: car.price.toString(),
       mileage: car.mileage.toString(),
-      fuelType: car.fuelType,
+      fuelType: car.fuel_type,
       transmission: car.transmission,
-      ownershipHistory: car.ownershipHistory,
-      images: car.images.join(', '),
+      ownershipHistory: car.ownership_history,
+      images: car.images?.join(', ') || '',
       description: car.description,
       condition: car.condition,
       engine: car.specifications?.engine || '',
@@ -287,9 +289,9 @@ export default function RoomDetailsPage() {
         year: Number(editCarFormData.year),
         price: Number(editCarFormData.price),
         mileage: Number(editCarFormData.mileage),
-        fuelType: editCarFormData.fuelType,
+        fuel_type: editCarFormData.fuelType,
         transmission: editCarFormData.transmission,
-        ownershipHistory: editCarFormData.ownershipHistory,
+        ownership_history: editCarFormData.ownershipHistory,
         images: editCarFormData.images.split(',').map(img => img.trim()).filter(img => img !== ''),
         description: editCarFormData.description,
         condition: editCarFormData.condition,
@@ -341,17 +343,30 @@ export default function RoomDetailsPage() {
     }
   };
 
+  const clearFilters = () => {
+    setSearchTerm('');
+    setPriceRange({ min: '', max: '' });
+    setSelectedFuelType('');
+    setSelectedAvailability('');
+  };
+
   const applyFilters = () => {
     let filtered = cars.filter(car => {
-      const matchesSearch = car.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           car.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           car.model.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch = car.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           car.brand?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           car.model?.toLowerCase().includes(searchTerm.toLowerCase());
 
-      const matchesPrice = (!priceRange.min || car.price >= parseInt(priceRange.min)) &&
-                          (!priceRange.max || car.price <= parseInt(priceRange.max));
+      // Parse price values, handling empty strings
+      const minPrice = priceRange.min ? parseInt(priceRange.min) : NaN;
+      const maxPrice = priceRange.max ? parseInt(priceRange.max) : NaN;
 
-      const matchesFuelType = !selectedFuelType || car.fuelType === selectedFuelType;
-      const matchesAvailability = !selectedAvailability || car.availability === selectedAvailability;
+      const matchesPrice = (isNaN(minPrice) || car.price >= minPrice) &&
+                          (isNaN(maxPrice) || car.price <= maxPrice);
+
+      const matchesFuelType = !selectedFuelType || selectedFuelType.trim() === '' ||
+                              (car.fuel_type?.toLowerCase() === selectedFuelType.toLowerCase());
+      const matchesAvailability = !selectedAvailability || selectedAvailability.trim() === '' ||
+                                  (car.availability?.toLowerCase() === selectedAvailability.toLowerCase());
 
       return matchesSearch && matchesPrice && matchesFuelType && matchesAvailability;
     });
@@ -489,7 +504,7 @@ export default function RoomDetailsPage() {
               </div>
               <div className="flex items-center text-xs sm:text-sm opacity-80">
                 <Users className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                Dealer: {room.adminid?.username || 'Unknown'}
+                Dealer: {room.contact_info?.username || 'Unknown'}
               </div>
             </div>
           </div>
@@ -497,25 +512,40 @@ export default function RoomDetailsPage() {
           <div className="p-4 sm:p-6">
             <p className="text-gray-600 text-base sm:text-lg mb-3 sm:mb-4">{room.description}</p>
 
-            {room.contactInfo && (
+            {room.contact_info && (
               <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-4 text-xs sm:text-sm text-gray-500">
-                {room.contactInfo.phone && (
+                {room.contact_info.phone && (
                   <span className="flex items-center">
-                    <span className="mr-1">📞</span> {room.contactInfo.phone}
+                    <span className="mr-1">📞</span> {room.contact_info.phone}
                   </span>
                 )}
-                {room.contactInfo.email && (
+                {room.contact_info.email && (
                   <span className="flex items-center">
-                    <span className="mr-1">✉️</span> {room.contactInfo.email}
+                    <span className="mr-1">✉️</span> {room.contact_info.email}
                   </span>
                 )}
-                {room.contactInfo.address && (
+                {room.contact_info.address && (
                   <span className="flex items-center">
-                    <span className="mr-1">📍</span> {room.contactInfo.address}
+                    <span className="mr-1">📍</span> {room.contact_info.address}
                   </span>
                 )}
               </div>
             )}
+
+            {/* YouTube Button */}
+            <div className="mt-4 flex justify-center">
+              <Link href={`/youtube/${room.name}`} className="w-full sm:w-auto">
+                <Button className="w-full sm:w-auto bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white flex items-center gap-2 px-6 py-3 rounded-lg shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-300 group">
+                  <div className="bg-white/20 p-1.5 rounded-full group-hover:animate-pulse">
+                    <Youtube className="h-5 w-5 text-white" />
+                  </div>
+                  <span className="font-semibold">Watch Our Videos</span>
+                  <span className="transform group-hover:translate-x-1 transition-transform duration-300">
+                    →
+                  </span>
+                </Button>
+              </Link>
+            </div>
           </div>
         </div>
 
@@ -577,6 +607,19 @@ export default function RoomDetailsPage() {
               </SelectContent>
             </Select>
           </div>
+
+          {/* Clear Filters Button */}
+          {(searchTerm || priceRange.min || priceRange.max || selectedFuelType || selectedAvailability) && (
+            <div className="mt-4 text-center">
+              <Button
+                variant="outline"
+                onClick={clearFilters}
+                className="text-sm"
+              >
+                Clear All Filters
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Cars Grid */}
@@ -713,7 +756,7 @@ export default function RoomDetailsPage() {
                         </div>
                         <div className="flex items-center text-xs bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
                           <Fuel className="h-3 w-3 mr-1 text-gray-600 dark:text-gray-300" />
-                          <span className="text-gray-600 dark:text-gray-300">{car.fuelType}</span>
+                          <span className="text-gray-600 dark:text-gray-300">{car.fuel_type}</span>
                         </div>
                       </div>
                     </div>
@@ -726,7 +769,7 @@ export default function RoomDetailsPage() {
                         {car.transmission}
                       </Badge>
                       <Badge variant="outline" className="text-xs bg-purple-50 dark:bg-purple-900/50 border-purple-200 dark:border-purple-700 text-purple-800 dark:text-purple-200">
-                        {car.ownershipHistory}
+                        {car.ownership_history}
                       </Badge>
                     </div>
                   <div className="flex gap-2 pt-2 border-t border-gray-100 dark:border-gray-700">

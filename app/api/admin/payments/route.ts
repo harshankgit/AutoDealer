@@ -216,7 +216,7 @@ export async function PUT(req: Request) {
               ` : ''}
 
               <div style="text-align: center; margin-top: 30px;">
-                <a href="https://car-selling-rho.vercel.app/profile" style="background-color: #007bff; color: #ffffff; padding: 12px 25px; border-radius: 5px; text-decoration: none; font-weight: bold;">View Profile</a>
+                <a href="https://auto-dealer-beige.vercel.app/profile" style="background-color: #007bff; color: #ffffff; padding: 12px 25px; border-radius: 5px; text-decoration: none; font-weight: bold;">View Profile</a>
               </div>
 
               <div style="text-align: center; margin-top: 40px; font-size: 12px; color: #777;">

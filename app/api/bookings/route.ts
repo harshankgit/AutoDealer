@@ -163,7 +163,7 @@ export async function POST(req: Request) {
             </table>
 
             <div style="text-align: center; margin-top: 30px;">
-              <a href="https://car-selling-rho.vercel.app/admin" style="background-color: #007bff; color: #ffffff; padding: 12px 25px; border-radius: 5px; text-decoration: none; font-weight: bold;">View All Bookings</a>
+              <a href="https://auto-dealer-beige.vercel.app/admin" style="background-color: #007bff; color: #ffffff; padding: 12px 25px; border-radius: 5px; text-decoration: none; font-weight: bold;">View All Bookings</a>
             </div>
 
             <div style="text-align: center; margin-top: 40px; font-size: 12px; color: #777;">
@@ -247,7 +247,7 @@ export async function POST(req: Request) {
             </div>
 
             <div style="text-align: center; margin-top: 30px;">
-              <a href="https://car-selling-rho.vercel.app/bookings" style="background-color: #007bff; color: #ffffff; padding: 12px 25px; border-radius: 5px; text-decoration: none; font-weight: bold;">View My Bookings</a>
+              <a href="https://auto-dealer-beige.vercel.app/bookings" style="background-color: #007bff; color: #ffffff; padding: 12px 25px; border-radius: 5px; text-decoration: none; font-weight: bold;">View My Bookings</a>
             </div>
 
             <div style="text-align: center; margin-top: 40px; font-size: 12px; color: #777;">

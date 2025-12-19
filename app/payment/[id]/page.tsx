@@ -20,6 +20,7 @@ import {
 import { useUser } from '@/context/user-context';
 import { toast } from 'sonner';
 import CameraScanner from '@/components/payment/CameraScanner';
+import { PaymentPageSkeleton } from '@/components/skeletons/PaymentPageSkeleton';
 
 interface Car {
   id: string;
@@ -294,10 +295,12 @@ export default function PaymentPage() {
   };
 
   if (loading) {
+    // Return a basic loading spinner while fetching data
     return (
-      <div className="container mx-auto py-8 px-4 flex justify-center items-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
+      // <div className="container mx-auto py-8 px-4 flex justify-center items-center">
+      //   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      // </div>
+      <PaymentPageSkeleton/>
     );
   }
 

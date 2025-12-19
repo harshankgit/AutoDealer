@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { roomServices } from '@/lib/supabase/services/generalServices';
 import { carServices } from '@/lib/supabase/services/carService'; // Import the Car service
 import { verifyToken } from '@/lib/auth';
+import { getSupabaseServiceRole } from '@/lib/supabase/server';
 
 interface Params {
   id: string;
@@ -18,7 +19,40 @@ export async function GET(request: Request, { params }: { params: Params }) {
       );
     }
 
-    return NextResponse.json({ room });
+    // If the room has an admin ID, fetch the admin's details
+    let enhancedRoom = { ...room };
+    if (room.adminid) {
+      // Get admin details using the Supabase service role client
+      const { data: adminData, error: adminError } = await getSupabaseServiceRole()
+        .from('users')
+        .select('id, username, email, phone')
+        .eq('id', room.adminid)
+        .single();
+
+      if (adminError) {
+        console.warn('Error fetching admin details:', adminError);
+        // Still return the room, just without admin details
+        enhancedRoom = {
+          ...room,
+          contact_info: {
+            ...room.contact_info,
+            username: 'Unknown'
+          }
+        };
+      } else {
+        enhancedRoom = {
+          ...room,
+          contact_info: {
+            phone: adminData.phone || null,
+            email: adminData.email || null,
+            username: adminData.username || 'Unknown',
+            ...room.contact_info // Preserve existing contact info if any
+          }
+        };
+      }
+    }
+
+    return NextResponse.json({ room: enhancedRoom });
   } catch (error) {
     console.error('Get room error:', error);
     return NextResponse.json(

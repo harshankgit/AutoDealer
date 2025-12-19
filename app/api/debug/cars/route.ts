@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase/client';
 import { getSupabaseServiceRole } from '@/lib/supabase/server';
@@ -8,9 +10,9 @@ export async function GET(request: Request) {
     // Get the token from headers
     const token = request.headers.get('authorization')?.replace('Bearer ', '');
     const decoded = verifyToken(token || '');
-    
+
     if (!decoded) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: 'Invalid or missing token',
         tokenPresent: !!token
       }, { status: 401 });
