@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verify } from 'jsonwebtoken';
 import { uploadImageUrlToStorage } from '@/lib/supabase/storage';

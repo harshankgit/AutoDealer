@@ -1,94 +1,98 @@
-import { NextResponse } from 'next/server';
-import { userServices } from '@/lib/supabase/services/userService';
-import { verifyToken } from '@/lib/auth';
+import { NextRequest } from 'next/server';
+import { logApi } from '@/lib/apiLogger';
+import { createClient } from '@supabase/supabase-js';
+import { verify } from 'jsonwebtoken';
 
-export async function GET(request: Request) {
+// Initialize Supabase client
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+// Helper function to verify JWT token and get user info
+const verifyToken = (token: string) => {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '');
-    const decoded = verifyToken(token || '');
-
-    if (!decoded || decoded.role !== 'superadmin') {
-      return NextResponse.json(
-        { error: 'Unauthorized - Super Admin access required' },
-        { status: 401 }
-      );
-    }
-
-    // Get all users
-    const users = await userServices.getAllUsers();
-
-    // Remove password from response
-    const usersWithoutPassword = users.map(user => ({
-      id: user.id,
-      username: user.username,
-      email: user.email,
-      role: user.role,
-      created_at: user.created_at,
-      updated_at: user.updated_at
-    }));
-
-    return NextResponse.json({ users: usersWithoutPassword });
+    // Use your JWT secret to verify the token
+    const JWT_SECRET = process.env.JWT_SECRET!;
+    const decoded = verify(token, JWT_SECRET) as { userId: string; role: string };
+    return { valid: true, userId: decoded.userId, role: decoded.role };
   } catch (error) {
-    console.error('Get all users error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    console.error('Token verification error:', error);
+    return { valid: false, userId: null, role: null };
   }
-}
+};
 
-export async function POST(request: Request) {
+// Helper function to get client IP
+const getClientIp = (request: NextRequest): string => {
+  return request.headers.get('x-forwarded-for') ||
+         request.headers.get('x-real-ip') ||
+         request.headers.get('x-client-ip') ||
+         'unknown';
+};
+
+// Helper function to log the API request
+const logApiCall = async (request: NextRequest, statusCode: number, userId: string | null, startTime: number, error?: string) => {
+  const ip = getClientIp(request);
+  const userAgent = request.headers.get('user-agent') || 'unknown';
+  const responseTime = Date.now() - startTime;
+
+  await logApi({
+    endpoint: request.nextUrl.pathname,
+    method: request.method,
+    statusCode,
+    responseTime,
+    userId,
+    requestPayload: null,
+    responsePayload: null,
+    errorMessage: error || null,
+    req: request,
+  });
+};
+
+export async function GET(request: NextRequest) {
+  const startTime = Date.now();
+  let userId: string | null = null;
+  
+  // Check if user is authenticated and has superadmin role
+  const authHeader = request.headers.get('authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    await logApiCall(request, 401, userId, startTime, 'Unauthorized');
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const token = authHeader.substring(7);
+  const tokenData = verifyToken(token);
+
+  userId = tokenData.userId || null;
+
+  if (!tokenData.valid || !tokenData.userId || tokenData.role !== 'superadmin') {
+    await logApiCall(request, 403, userId, startTime, 'Forbidden: Super admin access required');
+    return Response.json({ error: 'Unauthorized: Super admin access required' }, { status: 403 });
+  }
+
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '');
-    const decoded = verifyToken(token || '');
+    // Get all users with admin role
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, username, email, created_at')
+      .eq('role', 'admin')
+      .order('created_at', { ascending: false });
 
-    if (!decoded || decoded.role !== 'superadmin') {
-      return NextResponse.json(
-        { error: 'Unauthorized - Super Admin access required' },
-        { status: 401 }
-      );
+    if (error) {
+      console.error('Error fetching admins:', error);
+      await logApiCall(request, 500, userId, startTime, error.message);
+      return Response.json({ error: 'Failed to fetch admins' }, { status: 500 });
     }
 
-    const { username, email, password, role } = await request.json();
-
-    // Validate input
-    if (!username || !email || !password || !role) {
-      return NextResponse.json(
-        { error: 'Please provide username, email, password, and role' },
-        { status: 400 }
-      );
-    }
-
-    // Create user (password will be hashed in service)
-    const user = await userServices.createUser({
-      username,
-      email,
-      password,
-      role,
-      favorites: [],
+    const response = Response.json({ 
+      admins: data || [],
+      count: data?.length || 0
     });
-
-    if (!user) {
-      return NextResponse.json(
-        { error: 'User with this email or username already exists' },
-        { status: 400 }
-      );
-    }
-
-    return NextResponse.json({
-      message: 'User created successfully',
-      user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-      },
-    });
+    
+    await logApiCall(request, response.status, userId, startTime);
+    return response;
   } catch (error: any) {
-    console.error('Create user error:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
+    console.error('Unexpected error fetching admins:', error);
+    await logApiCall(request, 500, userId, startTime, error.message);
+    return Response.json({ error: 'Failed to fetch admins' }, { status: 500 });
   }
 }

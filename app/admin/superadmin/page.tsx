@@ -6,10 +6,15 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Users, Home, Car, BarChart3, Settings, Loader2, Trash2, Edit, Eye, MessageCircle, Bot } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import Link from 'next/link';
 import { useUser } from '@/context/user-context';
 import { AdminDashboardSkeleton } from '@/components/skeletons/AdminDashboardSkeleton';
 import SuperAdminImageUpload from '@/components/slider/SuperAdminImageUpload';
+import ApiLogs from '@/components/slider/ApiLogs';
+import { toast } from 'sonner';
 
 interface User {
   id: string;
@@ -157,6 +162,8 @@ export default function SuperAdminDashboard() {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [loggingEnabled, setLoggingEnabled] = useState(false);
+  const [settingsLoading, setSettingsLoading] = useState(true);
   const router = useRouter();
   const { user, loading } = useUser(); // Use context instead of local state
 
@@ -360,6 +367,98 @@ export default function SuperAdminDashboard() {
     }
   };
 
+  const fetchLoggingSettings = async () => {
+    try {
+      const token = user?.token;
+      if (!token) {
+        return;
+      }
+
+      const response = await fetch('/api/admin/api-logging-toggle', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setLoggingEnabled(data.enabled);
+      }
+    } catch (error) {
+      console.error('Error fetching logging settings:', error);
+    } finally {
+      setSettingsLoading(false);
+    }
+  };
+
+  const toggleLogging = async (enabled: boolean) => {
+    try {
+      const token = user?.token;
+      if (!token) {
+        return;
+      }
+
+      const response = await fetch('/api/admin/api-logging-toggle', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          enabled
+        })
+      });
+
+      if (response.ok) {
+        setLoggingEnabled(enabled);
+      }
+    } catch (error) {
+      console.error('Error toggling logging:', error);
+    }
+  };
+
+  const saveRetentionSettings = async () => {
+    try {
+      const token = user?.token;
+      if (!token) {
+        return;
+      }
+
+      const retentionInput = document.getElementById('retention-days') as HTMLInputElement;
+      const retentionDays = parseInt(retentionInput?.value) || 30;
+
+      // Update the API logging retention setting
+      const response = await fetch('/api/system-settings', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          settingKey: 'api_log_retention_days',
+          settingValue: retentionDays.toString()
+        })
+      });
+
+      if (response.ok) {
+        // Show success message
+       toast.success(`Retention period updated to ${retentionDays} days`);
+      } else {
+        throw new Error('Failed to update retention settings');
+      }
+    } catch (error) {
+      console.error('Error saving retention settings:', error);
+      alert('Failed to save retention settings');
+    }
+  };
+
+  // Fetch logging settings when component mounts
+  useEffect(() => {
+    if (user && user.role === 'superadmin') {
+      fetchLoggingSettings();
+    }
+  }, [user]);
+
   if (loading || isLoading) {
     return <AdminDashboardSkeleton />;
   }
@@ -389,7 +488,7 @@ export default function SuperAdminDashboard() {
 
         <Tabs defaultValue="overview" className="space-y-6">
           <div className="w-full overflow-x-auto">
-            <TabsList className="flex flex-wrap justify-start w-max min-w-full sm:w-auto sm:min-w-0 sm:justify-between sm:grid sm:grid-cols-10">
+            <TabsList className="flex flex-wrap justify-start w-max min-w-full sm:w-auto sm:min-w-0 sm:justify-between sm:grid sm:grid-cols-11">
               <TabsTrigger value="overview" className="text-xs sm:text-sm px-2 py-1 sm:px-3 sm:py-2 whitespace-nowrap">Overview</TabsTrigger>
               <TabsTrigger value="users" className="text-xs sm:text-sm px-2 py-1 sm:px-3 sm:py-2 whitespace-nowrap">Users</TabsTrigger>
               <TabsTrigger value="showrooms" className="text-xs sm:text-sm px-2 py-1 sm:px-3 sm:py-2 whitespace-nowrap">Showrooms</TabsTrigger>
@@ -400,6 +499,9 @@ export default function SuperAdminDashboard() {
               <TabsTrigger value="chatbot" className="text-xs sm:text-sm px-2 py-1 sm:px-3 sm:py-2 whitespace-nowrap">Chatbot</TabsTrigger>
               {user?.role === 'superadmin' && (
                 <TabsTrigger value="slider" className="text-xs sm:text-sm px-2 py-1 sm:px-3 sm:py-2 whitespace-nowrap">Slider</TabsTrigger>
+              )}
+              {user?.role === 'superadmin' && (
+                <TabsTrigger value="logs" className="text-xs sm:text-sm px-2 py-1 sm:px-3 sm:py-2 whitespace-nowrap">Logs</TabsTrigger>
               )}
               <TabsTrigger value="settings" className="text-xs sm:text-sm px-2 py-1 sm:px-3 sm:py-2 whitespace-nowrap">Settings</TabsTrigger>
             </TabsList>
@@ -509,7 +611,7 @@ export default function SuperAdminDashboard() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <Link href="/admin/users">
                     <Button variant="outline" className="w-full h-20 flex flex-col items-center justify-center">
                       <Users className="h-6 w-6 mb-2" />
@@ -523,11 +625,22 @@ export default function SuperAdminDashboard() {
                     </Button>
                   </Link>
                   <Link href="/admin">
-                    <Button className="w-full h-20 flex flex-col items-center justify-center bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800">
+                    <Button variant="outline" className="w-full h-20 flex flex-col items-center justify-center">
                       <BarChart3 className="h-6 w-6 mb-2" />
                       View Dashboard
                     </Button>
                   </Link>
+                  {user?.role === 'superadmin' && (
+                    <Link href="/admin/api-logs">
+                      <Button
+                        variant="outline"
+                        className="w-full h-20 flex flex-col items-center justify-center"
+                      >
+                        <BarChart3 className="h-6 w-6 mb-2" />
+                        API Logs
+                      </Button>
+                    </Link>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -924,38 +1037,159 @@ export default function SuperAdminDashboard() {
             </Card>
           </TabsContent>
 
+          {user?.role === 'superadmin' && (
+            <TabsContent value="logs" className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold dark:text-white">API Logs</h2>
+              </div>
+
+              <Card className="bg-white dark:bg-gray-800">
+                <CardHeader>
+                  <CardTitle className="text-lg dark:text-white">Monitor API Activity</CardTitle>
+                  <CardDescription className="dark:text-gray-300">
+                    View all API requests, errors, and performance metrics
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="w-full">
+                    <ApiLogs />
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+
           <TabsContent value="settings" className="space-y-6">
             <Card className="bg-white dark:bg-gray-800">
               <CardHeader>
                 <CardTitle className="dark:text-white">System Settings</CardTitle>
                 <CardDescription className="dark:text-gray-300">
-                  Manage system-wide configurations
+                  Configure system-wide settings and preferences
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium dark:text-white">System Information</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-gray-600 dark:text-gray-300">Total Users</p>
-                      <p className="font-semibold dark:text-white">{stats.totalUsers}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600 dark:text-gray-300">Total Showrooms</p>
-                      <p className="font-semibold dark:text-white">{stats.totalShowrooms}</p>
+                <div className="space-y-6">
+                  {/* API Logging Section */}
+                  <div className="border rounded-lg p-6 bg-white dark:bg-gray-800">
+                    <h3 className="text-lg font-medium dark:text-white mb-2">API Logging</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+                      Configure API request logging and retention settings
+                    </p>
+
+                    <div className="space-y-6">
+                      <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                        <div>
+                          <h4 className="font-medium dark:text-white">API Logging Status</h4>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            Toggle to enable or disable logging of all API requests
+                          </p>
+                        </div>
+                        <div className="flex items-center space-x-4">
+                          <span className="text-sm font-medium px-3 py-1 bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 rounded-full">
+                            {settingsLoading ? 'Loading...' : (loggingEnabled ? 'Enabled' : 'Disabled')}
+                          </span>
+                          <Switch
+                            checked={loggingEnabled}
+                            onCheckedChange={toggleLogging}
+                            disabled={settingsLoading}
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  
-                  <div className="pt-4 border-t dark:border-gray-700">
-                    <h3 className="text-lg font-medium dark:text-white">Actions</h3>
-                    <div className="flex flex-wrap gap-2 pt-2">
-                      <Button variant="outline" className="bg-blue-600 hover:bg-blue-700 text-white">
+
+                  {/* API Log Retention Section */}
+                  <div className="border rounded-lg p-6 bg-white dark:bg-gray-800">
+                    <h3 className="text-lg font-medium dark:text-white mb-2">API Log Retention</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+                      Configure how long API logs are retained before automatic deletion
+                    </p>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="retention-days" className="text-sm font-medium dark:text-gray-300 block mb-2">
+                          Retention Period (Days)
+                        </Label>
+                        <Input
+                          id="retention-days"
+                          type="number"
+                          defaultValue="30"
+                          min="1"
+                          max="365"
+                          className="mt-1"
+                          placeholder="Days to retain logs"
+                        />
+                      </div>
+                      <div className="flex items-end">
+                        <Button
+                          variant="outline"
+                          className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                          onClick={saveRetentionSettings}
+                        >
+                          Save Settings
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Scheduled Cleanup Section */}
+                  <div className="border rounded-lg p-6 bg-white dark:bg-gray-800">
+                    <h3 className="text-lg font-medium dark:text-white mb-2">Scheduled Cleanup</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+                      API logs are automatically cleaned up daily based on the retention period
+                    </p>
+
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-sm font-medium dark:text-white">Automatic Cleanup</span>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Runs daily at midnight server time</p>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <span className="text-sm text-gray-600 dark:text-gray-400">Active</span>
+                        <Switch defaultChecked />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* System Information Section */}
+                  <div className="border rounded-lg p-6 bg-white dark:bg-gray-800">
+                    <h3 className="text-lg font-medium dark:text-white mb-4">System Information</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="flex items-center space-x-4">
+                        <div className="flex-shrink-0 w-12 h-12 bg-blue-100 dark:bg-blue-900/50 rounded-lg flex items-center justify-center">
+                          <Users className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">Total Users</p>
+                          <p className="font-semibold text-lg dark:text-white">{stats.totalUsers}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-4">
+                        <div className="flex-shrink-0 w-12 h-12 bg-green-100 dark:bg-green-900/50 rounded-lg flex items-center justify-center">
+                          <Home className="h-6 w-6 text-green-600 dark:text-green-400" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">Total Showrooms</p>
+                          <p className="font-semibold text-lg dark:text-white">{stats.totalShowrooms}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Other Actions Section */}
+                  <div className="border rounded-lg p-6 bg-white dark:bg-gray-800">
+                    <h3 className="text-lg font-medium dark:text-white mb-4">Other Actions</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      <Button variant="outline" className="justify-start bg-blue-600 hover:bg-blue-700 text-white">
+                        <BarChart3 className="h-4 w-4 mr-2" />
                         Export User Data
                       </Button>
-                      <Button variant="outline" className="bg-red-600 hover:bg-red-700 text-white">
+                      <Button variant="outline" className="justify-start bg-red-600 hover:bg-red-700 text-white">
+                        <Settings className="h-4 w-4 mr-2" />
                         System Backup
                       </Button>
-                      <Button variant="outline">
+                      <Button variant="outline" className="justify-start">
+                        <Loader2 className="h-4 w-4 mr-2" />
                         Clear Cache
                       </Button>
                     </div>

@@ -70,59 +70,36 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Get all bookings with related information
+    // Get all scanner images with admin and room information
     const { data, error } = await supabase
-      .from('bookings')
+      .from('scanner_images')
       .select(`
         id,
-        car_id,
-        user_id,
+        admin_id,
         room_id,
-        start_date,
-        end_date,
-        total_price,
-        status,
-        created_at,
-        updated_at,
-        user:userid(username, email),
-        car:carid(title, brand, model, year, price),
+        image_url,
+        uploaded_at,
+        admin:adminid(username, email),
         room:roomid(name)
       `)
-      .order('created_at', { ascending: false });
+      .order('uploaded_at', { ascending: false });
 
     if (error) {
-      console.error('Error fetching bookings:', error);
+      console.error('Error fetching scanner images:', error);
       await logApiCall(request, 500, userId, startTime, error.message);
-      return Response.json({ error: 'Failed to fetch bookings' }, { status: 500 });
+      return Response.json({ error: 'Failed to fetch scanner images' }, { status: 500 });
     }
 
-    // Transform the data to match the expected format
-    const transformedBookings = data.map(booking => ({
-      id: booking.id,
-      car_id: booking.car_id,
-      user_id: booking.user_id,
-      room_id: booking.room_id,
-      customer_name: (booking.user as any)?.username || 'Unknown Customer',
-      car_title: (booking.car as any)?.title || 'Unknown Car',
-      room_name: (booking.room as any)?.name || 'Unknown Room',
-      booking_date: booking.created_at,
-      status: booking.status,
-      total_amount: booking.total_price,
-      car: booking.car,
-      user: booking.user,
-      room: booking.room
-    }));
-
     const response = Response.json({ 
-      bookings: transformedBookings,
-      count: transformedBookings.length
+      scanners: data || [],
+      count: data?.length || 0
     });
     
     await logApiCall(request, response.status, userId, startTime);
     return response;
   } catch (error: any) {
-    console.error('Unexpected error fetching bookings:', error);
+    console.error('Unexpected error fetching scanner images:', error);
     await logApiCall(request, 500, userId, startTime, error.message);
-    return Response.json({ error: 'Failed to fetch bookings' }, { status: 500 });
+    return Response.json({ error: 'Failed to fetch scanner images' }, { status: 500 });
   }
 }

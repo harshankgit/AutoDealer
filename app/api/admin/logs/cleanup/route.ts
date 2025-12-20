@@ -52,77 +52,62 @@ export async function GET(request: NextRequest) {
   const startTime = Date.now();
   let userId: string | null = null;
   
-  // Check if user is authenticated and has superadmin role
+  // Check if user is authenticated - this could be called by a scheduled job or admin
   const authHeader = request.headers.get('authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    await logApiCall(request, 401, userId, startTime, 'Unauthorized');
-    return Response.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7);
+    const tokenData = verifyToken(token);
 
-  const token = authHeader.substring(7);
-  const tokenData = verifyToken(token);
-
-  userId = tokenData.userId || null;
-
-  if (!tokenData.valid || !tokenData.userId || tokenData.role !== 'superadmin') {
-    await logApiCall(request, 403, userId, startTime, 'Forbidden: Super admin access required');
-    return Response.json({ error: 'Unauthorized: Super admin access required' }, { status: 403 });
+    if (tokenData.valid) {
+      userId = tokenData.userId;
+    }
   }
 
   try {
-    // Get all bookings with related information
-    const { data, error } = await supabase
-      .from('bookings')
-      .select(`
-        id,
-        car_id,
-        user_id,
-        room_id,
-        start_date,
-        end_date,
-        total_price,
-        status,
-        created_at,
-        updated_at,
-        user:userid(username, email),
-        car:carid(title, brand, model, year, price),
-        room:roomid(name)
-      `)
-      .order('created_at', { ascending: false });
+    // Get the log retention period from system settings or default to 30 days
+    const { data: settingsData, error: settingsError } = await supabase
+      .from('system_settings')
+      .select('setting_value')
+      .eq('setting_key', 'api_log_retention_days')
+      .single();
+
+    let retentionDays = 30; // default
+    if (!settingsError && settingsData && settingsData.setting_value) {
+      retentionDays = parseInt(settingsData.setting_value) || 30;
+    }
+    
+    // Calculate the cutoff date
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
+
+    console.log(`Cleaning up API logs older than ${cutoffDate.toISOString()} (retention: ${retentionDays} days)`);
+
+    // Delete logs older than the cutoff date
+    const { error, count } = await supabase
+      .from('api_logs')
+      .delete()
+      .lt('created_at', cutoffDate.toISOString());
 
     if (error) {
-      console.error('Error fetching bookings:', error);
+      console.error('Error cleaning up API logs:', error);
       await logApiCall(request, 500, userId, startTime, error.message);
-      return Response.json({ error: 'Failed to fetch bookings' }, { status: 500 });
+      return Response.json({ error: 'Failed to clean up API logs', details: error.message }, { status: 500 });
     }
 
-    // Transform the data to match the expected format
-    const transformedBookings = data.map(booking => ({
-      id: booking.id,
-      car_id: booking.car_id,
-      user_id: booking.user_id,
-      room_id: booking.room_id,
-      customer_name: (booking.user as any)?.username || 'Unknown Customer',
-      car_title: (booking.car as any)?.title || 'Unknown Car',
-      room_name: (booking.room as any)?.name || 'Unknown Room',
-      booking_date: booking.created_at,
-      status: booking.status,
-      total_amount: booking.total_price,
-      car: booking.car,
-      user: booking.user,
-      room: booking.room
-    }));
+    console.log(`Successfully cleaned up ${count} old API logs`);
 
     const response = Response.json({ 
-      bookings: transformedBookings,
-      count: transformedBookings.length
+      message: 'API logs cleanup completed successfully', 
+      deletedCount: count || 0,
+      cutoffDate: cutoffDate.toISOString(),
+      retentionDays 
     });
     
     await logApiCall(request, response.status, userId, startTime);
     return response;
   } catch (error: any) {
-    console.error('Unexpected error fetching bookings:', error);
+    console.error('Unexpected error during API logs cleanup:', error);
     await logApiCall(request, 500, userId, startTime, error.message);
-    return Response.json({ error: 'Failed to fetch bookings' }, { status: 500 });
+    return Response.json({ error: 'Failed to clean up API logs', details: error.message }, { status: 500 });
   }
 }

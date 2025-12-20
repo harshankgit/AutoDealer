@@ -25,7 +25,8 @@ import {
   Car,
   Heart,
   FileText,
-  Download
+  Download,
+  Home
 } from 'lucide-react';
 import { useUser } from '@/context/user-context';
 import { toast } from 'sonner';
@@ -70,18 +71,88 @@ export default function ProfilePage() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [logRetentionDays, setLogRetentionDays] = useState<number>(30);
+  const [isSettingsLoading, setIsSettingsLoading] = useState(false);
 
   useEffect(() => {
     fetchUserData();
     if (user?.role === 'admin') {
       fetchAdminStats();
       fetchAdminPayments();
+    } else if (user?.role === 'superadmin') {
+      // Super admin has access to all data, but we'll load default settings
+      fetchSuperAdminSettings();
+      fetchSuperAdminBookings(); // Fetch all admin bookings
     } else {
       fetchBookingStats();
       fetchBookings();
       fetchUserPayments();
     }
   }, [user]);
+
+  const fetchSuperAdminBookings = async () => {
+    if (!user || user.role !== 'superadmin') return;
+
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        router.push('/login');
+        return;
+      }
+
+      const response = await fetch('/api/admin/bookings', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setBookings(data.bookings || []);
+      } else {
+        const errorData = await response.json();
+        toast.error(errorData.error || 'Failed to fetch bookings');
+        setBookings([]);
+      }
+    } catch (error) {
+      console.error('Error fetching super admin bookings:', error);
+      toast.error('Failed to fetch bookings');
+      setBookings([]);
+    }
+  };
+
+  const fetchSuperAdminSettings = async () => {
+    if (!user || user.role !== 'superadmin') return;
+
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        router.push('/login');
+        return;
+      }
+
+      const response = await fetch('/api/system-settings', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const logRetentionSetting = data.settings.find(
+          (setting: any) => setting.setting_key === 'api_log_retention_days'
+        );
+
+        if (logRetentionSetting) {
+          setLogRetentionDays(parseInt(logRetentionSetting.setting_value) || 30);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching super admin settings:', error);
+      // Use default value if fetch fails
+      setLogRetentionDays(30);
+    }
+  };
 
   const fetchUserData = async () => {
     if (!user) return;
@@ -487,6 +558,54 @@ export default function ProfilePage() {
     }
   };
 
+  const handleSaveLogRetentionSettings = async () => {
+    if (!user || user.role !== 'superadmin') {
+      toast.error('Only super admins can change system settings');
+      return;
+    }
+
+    if (logRetentionDays < 1 || logRetentionDays > 365) {
+      toast.error('Retention days must be between 1 and 365');
+      return;
+    }
+
+    setIsSettingsLoading(true);
+
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        toast.error('Authentication token not found');
+        return;
+      }
+
+      // Update the system settings in the database
+      const response = await fetch('/api/system-settings', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          settingKey: 'api_log_retention_days',
+          settingValue: logRetentionDays.toString(),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        toast.success(`Log retention settings updated to ${logRetentionDays} days`);
+      } else {
+        toast.error(data.error || 'Failed to update log retention settings');
+      }
+    } catch (error) {
+      console.error('Error updating log retention settings:', error);
+      toast.error('Failed to update log retention settings');
+    } finally {
+      setIsSettingsLoading(false);
+    }
+  };
+
   const fetchUserPayments = async () => {
     if (!user) return;
 
@@ -669,6 +788,9 @@ export default function ProfilePage() {
                   <TabsTrigger value="scanner">Scanner</TabsTrigger>
                 </>
               ) : null}
+              {user?.role === 'superadmin' && (
+                <TabsTrigger value="settings">Settings</TabsTrigger>
+              )}
               <TabsTrigger value="security">Security</TabsTrigger>
             </TabsList>
           </div>
@@ -1111,7 +1233,14 @@ export default function ProfilePage() {
           <TabsContent value="bookings" className="space-y-6">
             <Card>
               <CardHeader>
-                {user?.role === 'admin' ? (
+                {user?.role === 'superadmin' ? (
+                  <>
+                    <CardTitle>All Admin Bookings</CardTitle>
+                    <CardDescription>
+                      View all bookings across all admin showrooms organized by room
+                    </CardDescription>
+                  </>
+                ) : user?.role === 'admin' ? (
                   <>
                     <CardTitle>Your Cars Activity</CardTitle>
                     <CardDescription>
@@ -1148,6 +1277,83 @@ export default function ProfilePage() {
                       </div>
                     ))}
                   </div>
+                ) : user?.role === 'superadmin' ? (
+                  // Superadmin bookings for all admins organized by room
+                  bookings.length > 0 ? (
+                    <div className="space-y-6">
+                      {/* Group bookings by room */}
+                      {(() => {
+                        // Group bookings by room name
+                        const bookingsByRoom: { [key: string]: any[] } = {};
+                        bookings.forEach((booking: any) => {
+                          const roomName = booking.room_name || 'Unknown Room';
+                          if (!bookingsByRoom[roomName]) {
+                            bookingsByRoom[roomName] = [];
+                          }
+                          bookingsByRoom[roomName].push(booking);
+                        });
+
+                        return Object.entries(bookingsByRoom).map(([roomName, roomBookings]) => (
+                          <div key={roomName} className="border rounded-lg p-4">
+                            <h3 className="text-lg font-semibold mb-4 flex items-center">
+                              <Home className="h-5 w-5 mr-2 text-blue-500" />
+                              {roomName}
+                              <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">
+                                ({roomBookings.length} booking{roomBookings.length !== 1 ? 's' : ''})
+                              </span>
+                            </h3>
+                            <div className="space-y-3">
+                              {roomBookings.map((booking: any) => (
+                                <div
+                                  key={booking.id}
+                                  className="flex flex-col sm:flex-row sm:items-center justify-between p-3 border rounded-lg bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
+                                >
+                                  <div className="mb-2 sm:mb-0">
+                                    <h4 className="font-medium flex items-center">
+                                      <User className="h-4 w-4 mr-2 text-green-500" />
+                                      {booking.customer_name || 'Unknown Customer'}
+                                    </h4>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                                      {booking.car_title} • {new Date(booking.booking_date).toLocaleDateString()}
+                                    </p>
+                                  </div>
+                                  <div className="flex items-center space-x-4">
+                                    <Badge
+                                      variant={
+                                        booking.status === 'Completed' ? 'default' :
+                                        booking.status === 'Sold' ? 'default' :
+                                        booking.status === 'Pending' ? 'secondary' :
+                                        booking.status === 'Booked' ? 'secondary' :
+                                        booking.status === 'Confirmed' ? 'outline' :
+                                        'destructive'
+                                      }
+                                    >
+                                      {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                                    </Badge>
+                                    <p className="font-semibold">₹{booking.total_amount?.toLocaleString()}</p>
+                                    <Button variant="outline" size="sm" onClick={() => {
+                                      const carId = booking.carId?.id || booking.car?.id || booking.car_id;
+                                      router.push(`/chat/${carId}`);
+                                    }}>
+                                      View Details
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ));
+                      })()}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Car className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <h3 className="text-lg font-medium">No bookings found</h3>
+                      <p className="text-gray-500 dark:text-gray-400">
+                        There are no bookings across all admin showrooms yet.
+                      </p>
+                    </div>
+                  )
                 ) : user?.role === 'admin' ? (
                   // Admin bookings for their cars
                   bookings.length > 0 ? (
@@ -1497,14 +1703,102 @@ export default function ProfilePage() {
             )}
           </TabsContent>
 
+          {/* Settings Tab - Only for superadmins */}
+          {user?.role === 'superadmin' && (
+            <TabsContent value="settings" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>System Settings</CardTitle>
+                  <CardDescription>
+                    Configure system-wide settings and preferences
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-6">
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-medium">API Log Retention</h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        Configure how long API logs are retained before automatic deletion
+                      </p>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="log-retention-days">Retention Period (Days)</Label>
+                          <Input
+                            id="log-retention-days"
+                            type="number"
+                            min="1"
+                            max="365"
+                            value={logRetentionDays}
+                            onChange={(e) => setLogRetentionDays(parseInt(e.target.value) || 30)}
+                            placeholder="Enter number of days"
+                          />
+                        </div>
+
+                        <div className="flex items-end">
+                          <Button
+                            className="w-full md:w-auto"
+                            onClick={handleSaveLogRetentionSettings}
+                            disabled={isSettingsLoading}
+                          >
+                            {isSettingsLoading ? (
+                              <>
+                                <span className="mr-2">Saving...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Save className="h-4 w-4 mr-2" />
+                                Save Settings
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-4 border-t dark:border-gray-700">
+                      <h3 className="text-lg font-medium">Scheduled Cleanup</h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                        API logs are automatically cleaned up daily based on the retention period
+                      </p>
+
+                      <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium">Automatic Cleanup</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                              Runs daily at midnight server time
+                            </p>
+                          </div>
+                          <Badge variant="outline">Active</Badge>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+
           {user?.role === 'admin' || user?.role === 'superadmin' ? (
           <TabsContent value="payments" className="space-y-6">
             <Card className="bg-white dark:bg-gray-800">
               <CardHeader>
-                <CardTitle className="dark:text-white">Payments Management</CardTitle>
-                <CardDescription className="dark:text-gray-300">
-                  View and manage payment requests from customers
-                </CardDescription>
+                {user?.role === 'superadmin' ? (
+                  <>
+                    <CardTitle className="dark:text-white">All Admin Payments</CardTitle>
+                    <CardDescription className="dark:text-gray-300">
+                      View all payments across all admin showrooms organized by admin
+                    </CardDescription>
+                  </>
+                ) : (
+                  <>
+                    <CardTitle className="dark:text-white">Payments Management</CardTitle>
+                    <CardDescription className="dark:text-gray-300">
+                      View and manage payment requests from customers
+                    </CardDescription>
+                  </>
+                )}
               </CardHeader>
               <CardContent>
                 {loading ? (
@@ -1522,7 +1816,102 @@ export default function ProfilePage() {
                       ))}
                     </div>
                   </div>
+                ) : user?.role === 'superadmin' ? (
+                  // Superadmin view - all payments organized by admin
+                  <div className="space-y-4">
+                    {/* Group payments by admin */}
+                    {(() => {
+                      // Group payments by admin username
+                      const paymentsByAdmin: { [key: string]: any[] } = {};
+                      payments.forEach((payment: any) => {
+                        const adminName = payment.admin?.username || payment.room?.adminid?.username || 'Unknown Admin';
+                        if (!paymentsByAdmin[adminName]) {
+                          paymentsByAdmin[adminName] = [];
+                        }
+                        paymentsByAdmin[adminName].push(payment);
+                      });
+
+                      return Object.entries(paymentsByAdmin).map(([adminName, adminPayments]) => (
+                        <div key={adminName} className="border rounded-lg p-4">
+                          <h3 className="text-lg font-semibold mb-4 flex items-center">
+                            <User className="h-5 w-5 mr-2 text-blue-500" />
+                            {adminName}
+                            <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">
+                              ({adminPayments.length} payment{adminPayments.length !== 1 ? 's' : ''})
+                            </span>
+                          </h3>
+                          <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                              <thead className="bg-gray-50 dark:bg-gray-700">
+                                <tr>
+                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Car</th>
+                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Customer</th>
+                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Amount</th>
+                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date</th>
+                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                                {adminPayments.length > 0 ? (
+                                  adminPayments.map((payment: any) => (
+                                    <tr key={payment.id}>
+                                      <td className="px-6 py-4 whitespace-nowrap">
+                                        <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                          {payment.car?.title || 'N/A'}
+                                        </div>
+                                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                                          {payment.car?.brand} {payment.car?.model}
+                                        </div>
+                                      </td>
+                                      <td className="px-6 py-4 whitespace-nowrap">
+                                        <div className="text-sm text-gray-900 dark:text-white">
+                                          {payment.user?.username || 'N/A'}
+                                        </div>
+                                      </td>
+                                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                        ₹{payment.amount?.toLocaleString() || '0'}
+                                      </td>
+                                      <td className="px-6 py-4 whitespace-nowrap">
+                                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                          payment.payment_status === 'approved' ? 'bg-green-100 text-green-800 dark:bg-green-800/30 dark:text-green-400' :
+                                          payment.payment_status === 'rejected' ? 'bg-red-100 text-red-800 dark:bg-red-800/30 dark:text-red-400' :
+                                          payment.payment_status === 'pending' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-800/30 dark:text-yellow-400' :
+                                          'bg-blue-100 text-blue-800 dark:bg-blue-800/30 dark:text-blue-400'
+                                        }`}>
+                                          {payment.payment_status?.charAt(0).toUpperCase() + payment.payment_status?.slice(1) || 'Unknown'}
+                                        </span>
+                                      </td>
+                                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                        {new Date(payment.created_at).toLocaleDateString()}
+                                      </td>
+                                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => router.push(`/admin/payments/${payment.id}`)}
+                                        >
+                                          View Details
+                                        </Button>
+                                      </td>
+                                    </tr>
+                                  ))
+                                ) : (
+                                  <tr>
+                                    <td colSpan={6} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                                      No payments found
+                                    </td>
+                                  </tr>
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      ));
+                    })()}
+                  </div>
                 ) : (
+                  // Admin view - their own payments
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                       <div className="bg-blue-50 dark:bg-blue-950/30 p-4 rounded-lg">
