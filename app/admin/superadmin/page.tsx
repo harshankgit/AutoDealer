@@ -9,6 +9,7 @@ import { Users, Home, Car, BarChart3, Settings, Loader2, Trash2, Edit, Eye, Mess
 import Link from 'next/link';
 import { useUser } from '@/context/user-context';
 import { AdminDashboardSkeleton } from '@/components/skeletons/AdminDashboardSkeleton';
+import SuperAdminImageUpload from '@/components/slider/SuperAdminImageUpload';
 
 interface User {
   id: string;
@@ -388,7 +389,7 @@ export default function SuperAdminDashboard() {
 
         <Tabs defaultValue="overview" className="space-y-6">
           <div className="w-full overflow-x-auto">
-            <TabsList className="flex flex-wrap justify-start w-max min-w-full sm:w-auto sm:min-w-0 sm:justify-between sm:grid sm:grid-cols-9">
+            <TabsList className="flex flex-wrap justify-start w-max min-w-full sm:w-auto sm:min-w-0 sm:justify-between sm:grid sm:grid-cols-10">
               <TabsTrigger value="overview" className="text-xs sm:text-sm px-2 py-1 sm:px-3 sm:py-2 whitespace-nowrap">Overview</TabsTrigger>
               <TabsTrigger value="users" className="text-xs sm:text-sm px-2 py-1 sm:px-3 sm:py-2 whitespace-nowrap">Users</TabsTrigger>
               <TabsTrigger value="showrooms" className="text-xs sm:text-sm px-2 py-1 sm:px-3 sm:py-2 whitespace-nowrap">Showrooms</TabsTrigger>
@@ -397,6 +398,9 @@ export default function SuperAdminDashboard() {
               <TabsTrigger value="payments" className="text-xs sm:text-sm px-2 py-1 sm:px-3 sm:py-2 whitespace-nowrap">Payments</TabsTrigger>
               <TabsTrigger value="chats" className="text-xs sm:text-sm px-2 py-1 sm:px-3 sm:py-2 whitespace-nowrap">Chats</TabsTrigger>
               <TabsTrigger value="chatbot" className="text-xs sm:text-sm px-2 py-1 sm:px-3 sm:py-2 whitespace-nowrap">Chatbot</TabsTrigger>
+              {user?.role === 'superadmin' && (
+                <TabsTrigger value="slider" className="text-xs sm:text-sm px-2 py-1 sm:px-3 sm:py-2 whitespace-nowrap">Slider</TabsTrigger>
+              )}
               <TabsTrigger value="settings" className="text-xs sm:text-sm px-2 py-1 sm:px-3 sm:py-2 whitespace-nowrap">Settings</TabsTrigger>
             </TabsList>
           </div>
@@ -898,6 +902,26 @@ export default function SuperAdminDashboard() {
                 </Button>
               </Link>
             </div>
+          </TabsContent>
+
+          <TabsContent value="slider" className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold dark:text-white">Slider Management</h2>
+            </div>
+
+            <Card className="bg-white dark:bg-gray-800">
+              <CardHeader>
+                <CardTitle className="text-lg dark:text-white">Manage Homepage Slider</CardTitle>
+                <CardDescription className="dark:text-gray-300">
+                  Upload and manage images for the homepage slider
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="w-full">
+                  <SuperAdminImageUpload />
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="settings" className="space-y-6">

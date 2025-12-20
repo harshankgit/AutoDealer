@@ -8,6 +8,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MapPin, Phone, Mail, User, MessageCircle, Send } from 'lucide-react';
 import { toast } from 'sonner';
+import { GoogleMap, useLoadScript, Marker } from '@react-google-maps/api';
+import ImageSlider from '@/components/slider/ImageSlider';
 
 interface FormData {
   name: string;
@@ -15,6 +17,21 @@ interface FormData {
   subject: string;
   message: string;
 }
+
+// Define map container style
+const mapContainerStyle = {
+  width: '100%',
+  height: '300px',
+  borderRadius: '0.5rem',
+};
+
+// Khandwa, MP coordinates (you can adjust as needed)
+const center = {
+  lat: 21.83, // Latitude for Khandwa
+  lng: 76.35, // Longitude for Khandwa
+};
+
+const libraries = ['places'];
 
 export default function ContactPage() {
   const [formData, setFormData] = useState<FormData>({
@@ -25,6 +42,12 @@ export default function ContactPage() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Load Google Maps script
+  const { isLoaded, loadError } = useLoadScript({
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
+    libraries: libraries as any[],
+  });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -113,6 +136,49 @@ export default function ContactPage() {
     }
   };
 
+  const renderMap = () => {
+    // If there's an error loading the map or no API key, show a static image
+    if (loadError || !process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY) {
+      // Use a static map image as fallback
+      return (
+        <div className="bg-gray-100 dark:bg-gray-700 rounded-lg h-64 overflow-hidden">
+          <img
+            src={`https://maps.googleapis.com/maps/api/staticmap?center=21.83,76.35&zoom=15&size=600x400&maptype=roadmap&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&markers=color:red%7Clabel:C%7C21.83,76.35`}
+            alt="Location map of Mata Chowk, Khandwa, MP"
+            className="w-full h-full object-cover"
+          />
+        </div>
+      );
+    }
+
+    if (isLoaded) {
+      return (
+        <GoogleMap
+          mapContainerStyle={mapContainerStyle}
+          zoom={15}
+          center={center}
+          options={{
+            streetViewControl: false,
+            mapTypeControl: false,
+            fullscreenControl: true,
+            zoomControl: true,
+          }}
+        >
+          <Marker position={center} />
+        </GoogleMap>
+      );
+    }
+
+    return (
+      <div className="bg-gray-200 dark:bg-gray-700 rounded-lg h-64 flex items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
+          <p className="text-gray-500 dark:text-gray-400">Loading map...</p>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-6xl mx-auto">
@@ -183,16 +249,10 @@ export default function ContactPage() {
                     </div>
                   </div>
 
-                  {/* Map Placeholder */}
+                  {/* Google Map Integration */}
                   <div className="mt-8">
                     <h4 className="font-semibold text-gray-900 dark:text-white mb-3">Location</h4>
-                    <div className="bg-gray-200 dark:bg-gray-700 rounded-lg h-64 flex items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600">
-                      <div className="text-center">
-                        <MapPin className="h-12 w-12 text-gray-400 mx-auto mb-2" />
-                        <p className="text-gray-500 dark:text-gray-400">Interactive Map</p>
-                        <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">Mata Chowk, Khandwa, MP</p>
-                      </div>
-                    </div>
+                    {renderMap()}
                   </div>
                 </div>
               </CardContent>
@@ -331,6 +391,24 @@ export default function ContactPage() {
           </Card>
         </motion.div>
       </div>
+
+      {/* Image Slider Section */}
+      <motion.div
+        variants={itemVariants}
+        className="mt-16"
+      >
+        <h2 className="text-3xl font-bold text-center text-gray-900 dark:text-white mb-8">Our Gallery</h2>
+        <Card className="bg-white dark:bg-gray-800 shadow-lg border-0 p-6">
+          <CardContent className="p-0">
+            <div className="w-full">
+              <ImageSlider
+                autoSlide={true}
+                slideInterval={4000}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
     </div>
   );
 }

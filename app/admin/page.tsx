@@ -17,6 +17,7 @@ import { Label } from '@/components/ui/label';
 import BackButton from '@/components/BackButton';
 import { AdminDashboardSkeleton } from '@/components/skeletons/AdminDashboardSkeleton';
 import { toast } from 'sonner';
+import SuperAdminImageUpload from '@/components/slider/SuperAdminImageUpload';
 
 interface Room {
   id: string;
