@@ -1,166 +1,62 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import {
-  MessageCircle,
-  User,
-  Send,
-  Loader2,
-  Search,
-  Bell,
-  Settings,
-  MoreVertical,
-  Users,
-  Car,
-  Eye,
-  X,
-} from "lucide-react";
-import { useUser } from "@/context/user-context";
-import { usePusher } from "@/hooks/usePusher";
-import Link from "next/link";
-import { ChatDashboardSkeleton } from '@/components/skeletons/ChatDashboardSkeleton';
-
-interface UserChat {
-  id: string;
-  userid: string;
-  roomid: string;
-  created_at: string;
-  updated_at: string;
-  last_message_at: string;
-  is_active: boolean;
-  unread_count: number;
-  user: {
-    username: string;
-    email: string;
-  };
-  room?: {
-    name: string;
-  };
-}
-
-interface Message {
-  id: string;
-  conversation_id: string;
-  senderid: string;
-  message: string;
-  message_type: string;
-  car_details?: any;
-  file_url?: string;
-  file_name?: string;
-  file_type?: string;
-  is_read: boolean;
-  timestamp: string;
-  created_at: string;
-  sender: {
-    username: string;
-    role: string;
-  };
-}
+import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import { useUser } from '@/context/user-context';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { MessageCircle, Send, Loader2, Search, ArrowLeft, Bell } from 'lucide-react';
+import { useSupabaseChat } from '@/hooks/useSupabaseChat';
+import { MessageBubble } from '@/components/chat/MessageBubble';
+import { Conversation } from '@/types/chat';
+import { ChatListSkeleton, ChatMessagesSkeleton } from '@/components/chat/ChatSkeleton';
+import BackButton from '@/components/BackButton';
 
 export default function ChatDashboard() {
-  const { user, loading } = useUser();
   const router = useRouter();
-  const [chats, setChats] = useState<UserChat[]>([]);
-  const [selectedChat, setSelectedChat] = useState<UserChat | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [newMessage, setNewMessage] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+  const { user, loading } = useUser();
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
+  const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [adminIsTyping, setAdminIsTyping] = useState(false);
-  const [isTypingTimer, setIsTypingTimer] = useState<NodeJS.Timeout | null>(
-    null
-  );
+  const [isLoading, setIsLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showMobileList, setShowMobileList] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const pusherService = usePusher();
+
+  const { messages, sendMessage, isLoading: messagesLoading } = useSupabaseChat({
+    conversationId: selectedConversation?.id || null,
+    userId: user?.id || '',
+  });
 
   useEffect(() => {
-    if (
-      !loading &&
-      (!user || (user.role !== "admin" && user.role !== "superadmin"))
-    ) {
-      router.push("/login");
+    if (!loading && (!user || (user.role !== 'admin' && user.role !== 'superadmin'))) {
+      router.push('/login');
       return;
     }
-
     if (user) {
-      loadChats();
+      loadConversations();
+      const interval = setInterval(loadConversations, 5000);
+      return () => clearInterval(interval);
     }
-  }, [user, loading, router]);
+  }, [user, loading]);
 
   useEffect(() => {
-    if (selectedChat && pusherService) {
-      // Subscribe to real-time events for the selected chat
-      pusherService.subscribeToChannel(
-        `chat-${selectedChat.id}`,
-        "new-message",
-        (data: any) => {
-          if (data.conversationId === selectedChat.id) {
-            setMessages((prev) => {
-              // Avoid duplicate messages
-              if (!prev.some((msg) => msg.id === data.message.id)) {
-                return [...prev, data.message].sort(
-                  (a, b) =>
-                    new Date(a.timestamp).getTime() -
-                    new Date(b.timestamp).getTime()
-                );
-              }
-              return prev;
-            });
-          }
-        }
-      );
-
-      // Subscribe to typing events
-      pusherService.subscribeToChannel(
-        `chat-${selectedChat.id}`,
-        "typing-status",
-        (data: any) => {
-          if (data.conversationId === selectedChat.id) {
-            if (data.userId !== user?.id) {
-              // Show typing status for users, not self
-              setAdminIsTyping(data.isTyping);
-            }
-          }
-        }
-      );
-    }
-
-    return () => {
-      if (selectedChat && pusherService) {
-        pusherService.unsubscribeFromChannel(`chat-${selectedChat.id}`);
-      }
-
-      // Clear typing timer on unmount
-      if (isTypingTimer) {
-        clearTimeout(isTypingTimer);
-      }
-    };
-  }, [selectedChat, pusherService, user, isTypingTimer]);
-
-  useEffect(() => {
-    // Scroll to bottom when messages change
     scrollToBottom();
   }, [messages]);
 
-  const loadChats = async () => {
+  const loadConversations = async () => {
     try {
       if (!user) return;
-
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem('token');
       if (!token) {
-        router.push("/login");
+        router.push('/login');
         return;
       }
 
-      const viewType = user.role === "superadmin" ? "superadmin" : "admin";
+      const viewType = user.role === 'superadmin' ? 'superadmin' : 'admin';
       const response = await fetch(`/api/v2/chat?viewType=${viewType}`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -169,311 +65,112 @@ export default function ChatDashboard() {
 
       if (response.ok) {
         const data = await response.json();
-        // Sort chats: unread first, then by last message time
-        const sortedChats = data.conversations.sort(
-          (a: UserChat, b: UserChat) => {
-            if (a.unread_count > 0 && b.unread_count === 0) return -1;
-            if (a.unread_count === 0 && b.unread_count > 0) return 1;
-            return (
-              new Date(b.last_message_at).getTime() -
-              new Date(a.last_message_at).getTime()
-            );
-          }
-        );
-        setChats(sortedChats);
-      } else {
-        console.error("Failed to load chats");
+        setConversations(data.conversations || []);
       }
     } catch (error) {
-      console.error("Error loading chats:", error);
+      console.error('Error loading conversations:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const loadMessages = async (chatId: string) => {
-    try {
-      if (!user) return;
-
-      const token = localStorage.getItem("token");
-      if (!token) {
-        router.push("/login");
-        return;
-      }
-
-      // Use different endpoint based on user role
-      let endpoint = "";
-      if (user.role === "superadmin") {
-        endpoint = `/api/v2/superadmin/chats/${chatId}`;
-      } else {
-        // For admin, the chatId is roomid-userid
-        const chat = chats.find((c) => c.id === chatId);
-        if (chat) {
-          endpoint = `/api/v2/admin/chats/${chat.roomid}-${chat.userid}`;
-        } else {
-          return;
-        }
-      }
-
-      const response = await fetch(endpoint, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setMessages(data.chat.messages || []);
-      } else {
-        console.error("Failed to load messages");
-      }
-    } catch (error) {
-      console.error("Error loading messages:", error);
-    }
-  };
-
-  const handleChatSelect = (chat: UserChat) => {
-    setSelectedChat(chat);
-    loadMessages(chat.id);
-  };
-
-  const sendMessage = async (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !selectedChat) return;
+    if (!newMessage.trim() || !selectedConversation || isSending) return;
 
     setIsSending(true);
-
-    try {
-      if (!user) return;
-
-      const token = localStorage.getItem("token");
-      if (!token) {
-        router.push("/login");
-        return;
-      }
-
-      // Use different endpoint based on user role
-      let endpoint = "";
-      if (user.role === "superadmin") {
-        endpoint = `/api/v2/superadmin/chats/${selectedChat.id}`;
-      } else {
-        // For admin, the chatId is roomid-userid
-        endpoint = `/api/v2/admin/chats/${selectedChat.roomid}-${selectedChat.userid}`;
-      }
-
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          message: newMessage,
-          message_type: "text",
-        }),
-      });
-
-      if (response.ok) {
-        setNewMessage("");
-        // Messages will be updated via real-time events
-      } else {
-        console.error("Failed to send message");
-      }
-    } catch (error) {
-      console.error("Error sending message:", error);
-    } finally {
-      setIsSending(false);
+    const success = await sendMessage(newMessage);
+    if (success) {
+      setNewMessage('');
     }
-  };
-
-  // Function to handle typing indicator for admin/superadmin
-  const handleAdminTyping = async () => {
-    if (!selectedChat || !user || !pusherService) return;
-
-    // Send typing indicator via the pusher service
-    await pusherService.sendTypingIndicator(selectedChat.id, true);
-
-    // Clear any existing timer
-    if (isTypingTimer) {
-      clearTimeout(isTypingTimer);
-    }
-
-    // Set a new timer to stop typing after 1.5 seconds
-    const timer = setTimeout(() => {
-      if (selectedChat && user && pusherService) {
-        pusherService.sendTypingIndicator(selectedChat.id, false);
-      }
-    }, 1500);
-
-    setIsTypingTimer(timer);
+    setIsSending(false);
   };
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // Filter chats based on search term
-  const filteredChats = chats.filter(
-    (chat) =>
-      chat.user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      chat.user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (chat.room?.name &&
-        chat.room.name.toLowerCase().includes(searchTerm.toLowerCase()))
+  const filteredConversations = conversations.filter((conv) =>
+    conv.user?.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    conv.user?.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    conv.room?.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Sort chats: unread first, then by last message time
-  const sortedChats = filteredChats.sort((a, b) => {
+  const sortedConversations = filteredConversations.sort((a, b) => {
     if (a.unread_count > 0 && b.unread_count === 0) return -1;
     if (a.unread_count === 0 && b.unread_count > 0) return 1;
-    return (
-      new Date(b.last_message_at).getTime() -
-      new Date(a.last_message_at).getTime()
-    );
+    return new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime();
   });
 
-  const formatDate = (timestamp: string) => {
+  const formatTime = (timestamp: string) => {
     const date = new Date(timestamp);
     const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-
     if (date.toDateString() === today.toDateString()) {
-      return date.toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    } else if (date.toDateString() === yesterday.toDateString()) {
-      return "Yesterday";
-    } else {
-      return date.toLocaleDateString();
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
+    return date.toLocaleDateString();
   };
 
-  const formatTime = (timestamp: string) => {
-    return new Date(timestamp).toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
-  const renderMessageContent = (message: Message) => {
-    if (message.message_type === "car_details" && message.car_details) {
-      const carDetails = message.car_details;
-      return (
-        <div
-          className={`${
-            message.senderid === user?.id
-              ? "bg-gradient-to-r from-blue-500/20 to-indigo-600/20 border border-blue-500/30"
-              : "bg-white dark:bg-gray-700/80 border border-gray-200 dark:border-gray-600"
-          } rounded-lg p-3`}
-        >
-          <div className="flex items-start space-x-3">
-            {carDetails.images && carDetails.images[0] && (
-              <div className="flex-shrink-0">
-                <img
-                  src={carDetails.images[0]}
-                  alt={carDetails.title}
-                  className="w-12 h-12 object-cover rounded-md"
-                />
-              </div>
-            )}
-            <div className="flex-1 min-w-0">
-              <h4 className="font-semibold text-gray-900 dark:text-white text-sm truncate">
-                {carDetails.title}
-              </h4>
-              <p className="text-xs text-gray-600 dark:text-gray-300">
-                {carDetails.year} {carDetails.brand} {carDetails.model}
-              </p>
-              <p className="text-sm font-bold text-blue-600 dark:text-blue-400 mt-1">
-                ₹{carDetails.price?.toLocaleString()}
-              </p>
-              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                {carDetails.room_name}
-              </div>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    return <p className="text-sm">{message.message}</p>;
-  };
+  const totalUnread = conversations.reduce((sum, conv) => sum + conv.unread_count, 0);
 
   if (loading || isLoading) {
-    return <ChatDashboardSkeleton />;
+    return (
+      <div className="h-screen flex bg-background overflow-hidden">
+        <ChatListSkeleton />
+        <div className="flex-1">
+          <ChatMessagesSkeleton />
+        </div>
+      </div>
+    );
   }
 
-  if (!user) {
-    return null; // Redirect is handled in useEffect
-  }
+  if (!user) return null;
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Mobile Header - Shown only on mobile when chat is selected */}
-      <div className="lg:hidden p-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex items-center justify-between">
-        {selectedChat ? (
-          <>
-            <button
-              onClick={() => setSelectedChat(null)}
-              className="flex items-center text-gray-500 hover:text-gray-700"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5 mr-1"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 19l-7-7 7-7"
-                />
-              </svg>
-              Back
-            </button>
-            <div className="flex items-center space-x-2">
-              <Avatar className="h-8 w-8">
-                <AvatarFallback>
-                  {selectedChat.user.username.charAt(0).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <h3 className="font-medium text-gray-900 dark:text-white text-sm">
-                  {selectedChat.user.username}
-                </h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {adminIsTyping ? (
-                    <span className="text-blue-500">typing...</span>
-                  ) : (
-                    <span className="text-green-500">online</span>
-                  )}
-                </p>
+    <div className="h-screen flex flex-col bg-background overflow-hidden">
+      {/* Mobile Header */}
+      <div className="lg:hidden bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 shadow-sm">
+        <div className="flex items-center gap-3">
+          <BackButton variant="outline" size="sm" />
+          <h1 className="text-lg font-semibold text-foreground flex items-center gap-2">
+            <MessageCircle className="h-5 w-5 text-primary" />
+            {user.role === 'superadmin' ? 'All Chats' : 'Customer Chats'}
+          </h1>
+          {totalUnread > 0 && (
+            <div className="ml-auto relative">
+              <Bell className="h-6 w-6 text-muted-foreground" />
+              <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full animate-pulse">
+                {totalUnread}
               </div>
             </div>
-            <div className="w-8"></div> {/* Spacer to center the chat info */}
-          </>
-        ) : (
-          <div className="flex items-center justify-center w-full">
-            <h1 className="text-lg font-bold flex items-center">
-              <MessageCircle className="h-5 w-5 mr-2" />
-              {user.role === "superadmin"
-                ? "All Customer Chats"
-                : "Customer Chats"}
-            </h1>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
-      {/* Main Chat Container */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Chat List Sidebar - Shown on desktop always, mobile when no chat selected */}
-        <div className={`${selectedChat ? "hidden" : ""} md:flex flex-col md:w-96 flex-shrink-0 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900`}>
-          {/* Search */}
-          <div className="p-3 border-b border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800">
+        {/* Left Panel - User List (FIXED, NO SCROLL) */}
+        <div
+          className={`${showMobileList ? 'block' : 'hidden'
+            } lg:flex lg:flex-col w-full lg:w-96 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 shadow-sm`}
+        >
+          {/* Header - Fixed */}
+          <div className="flex-shrink-0 p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
+                <MessageCircle className="h-6 w-6 text-primary" />
+                {user.role === 'superadmin' ? 'All Conversations' : 'User Messages'}
+              </h2>
+              {totalUnread > 0 && (
+                <div className="relative">
+                  <Bell className="h-6 w-6 text-muted-foreground" />
+                  <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full animate-bounce">
+                    {totalUnread}
+                  </div>
+                </div>
+              )}
+            </div>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
                 type="text"
                 placeholder="Search customers..."
@@ -484,206 +181,152 @@ export default function ChatDashboard() {
             </div>
           </div>
 
-          {/* Chat List */}
+          {/* User List - Scrollable */}
           <div className="flex-1 overflow-y-auto">
-            {sortedChats.length === 0 ? (
-              <div className="p-8 text-center text-gray-500">
-                {user.role === "superadmin"
-                  ? "No active conversations across the system"
-                  : "No active conversations in your showroom"}
+            {sortedConversations.length === 0 ? (
+              <div className="p-8 text-center text-muted-foreground">
+                <MessageCircle className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                <p>No conversations yet</p>
               </div>
             ) : (
-              sortedChats.map((chat) => (
+              sortedConversations.map((conversation, index) => (
                 <div
-                  key={chat.id}
-                  className={`p-3 sm:p-4 border-b border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${
-                    selectedChat?.id === chat.id
-                      ? "bg-blue-50 dark:bg-blue-900/20"
-                      : ""
-                  }`}
-                  onClick={() => handleChatSelect(chat)}
+                  key={conversation.id}
+                  onClick={() => {
+                    setSelectedConversation(conversation);
+                    setShowMobileList(false);
+                  }}
+                  className={`p-4 border-b border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 animate-fadeIn ${selectedConversation?.id === conversation.id
+                      ? 'bg-gray-100 dark:bg-gray-700 border-l-4 border-l-primary'
+                      : ''
+                    }`}
+                  style={{ animationDelay: `${index * 30}ms` }}
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <Avatar className="h-10 w-10">
-                        <AvatarFallback>
-                          {chat.user.username.charAt(0).toUpperCase()}
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <Avatar className="h-12 w-12 ring-2 ring-white dark:ring-gray-800 shadow-sm">
+                        <AvatarFallback className="bg-primary text-primary-foreground font-bold">
+                          {conversation.user?.username.charAt(0).toUpperCase() || 'U'}
                         </AvatarFallback>
                       </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center">
-                          <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                            {chat.user.username}
-                          </p>
-                          {chat.unread_count > 0 && (
-                            <Badge
-                              className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs"
-                              variant="destructive"
-                            >
-                              {chat.unread_count}
+                      {conversation.unread_count > 0 && (
+                        <div className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center animate-pulse shadow-lg">
+                          <span className="text-white text-xs font-bold">
+                            {conversation.unread_count > 9 ? '9+' : conversation.unread_count}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <h3 className={`font-semibold truncate ${conversation.unread_count > 0 ? 'text-foreground' : 'text-muted-foreground'}`}>
+                            {conversation.user?.username || 'Unknown User'}
+                          </h3>
+                          {conversation.unread_count > 0 && (
+                            <Badge className="bg-red-500 text-white h-5 min-w-5 flex items-center justify-center rounded-full px-1.5 text-xs font-bold">
+                              {conversation.unread_count}
                             </Badge>
                           )}
                         </div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                          {chat.room?.name || "Unknown Room"}
-                        </p>
+                        <span className="text-xs text-muted-foreground flex-shrink-0 ml-2">
+                          {formatTime(conversation.last_message_at)}
+                        </span>
                       </div>
-                    </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">
-                      {formatDate(chat.last_message_at)}
+                      <p className={`text-sm truncate ${conversation.unread_count > 0 ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
+                        {conversation.room?.name || conversation.user?.email || ''}
+                      </p>
                     </div>
                   </div>
                 </div>
               ))
             )}
           </div>
-
-          {/* User Info Footer */}
-          <div className="p-3 border-t border-gray-200 dark:border-gray-700 flex items-center space-x-2 bg-gray-100 dark:bg-gray-800">
-            <Avatar className="h-8 w-8">
-              <AvatarFallback>
-                {user.username.charAt(0).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                {user.username}
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                {user.role === "superadmin" ? "Super Admin" : "Admin"}
-              </p>
-            </div>
-          </div>
         </div>
 
-        {/* Chat Window - Shown when chat is selected, hidden when no chat is selected */}
-        <div className={`${selectedChat ? "flex" : "hidden"} flex-1 flex-col bg-white dark:bg-gray-800`}>
-          {selectedChat && (
+        {/* Right Panel - Chat Window (SCROLLABLE) */}
+        <div
+          className={`${!showMobileList ? 'block' : 'hidden'
+            } lg:flex flex-1 flex-col bg-white dark:bg-gray-800 overflow-hidden`}
+        >
+          {selectedConversation ? (
             <>
-              {/* Chat Header */}
-              <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-white dark:bg-gray-800">
-                <div className="flex items-center space-x-3">
-                  <Avatar className="h-10 w-10">
-                    <AvatarFallback>
-                      {selectedChat.user.username.charAt(0).toUpperCase()}
+              {/* Chat Header - Fixed */}
+              <div className="flex-shrink-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setShowMobileList(true)}
+                    className="lg:hidden text-muted-foreground"
+                  >
+                    <ArrowLeft className="h-5 w-5" />
+                  </button>
+                  <Avatar className="h-10 w-10 ring-2 ring-gray-200 dark:ring-gray-700 shadow-sm">
+                    <AvatarFallback className="bg-primary text-primary-foreground font-bold">
+                      {selectedConversation.user?.username.charAt(0).toUpperCase() || 'U'}
                     </AvatarFallback>
                   </Avatar>
-                  <div>
-                    <h3 className="font-semibold text-gray-900 dark:text-white">
-                      {selectedChat.user.username}
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-foreground">
+                      {selectedConversation.user?.username || 'Unknown User'}
                     </h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {selectedChat.room?.name || "Customer"} •{" "}
-                      {adminIsTyping ? (
-                        <span className="text-blue-500">User is typing...</span>
-                      ) : (
-                        <span className="text-green-500">Online</span>
-                      )}
+                    <p className="text-sm text-muted-foreground">
+                      {selectedConversation.room?.name || selectedConversation.user?.email || ''}
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <Button variant="ghost" size="sm" className="text-gray-500">
-                    <Bell className="h-5 w-5" />
-                  </Button>
-                  <Link href={`/admin/user/${selectedChat.userid}`}>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-gray-500"
-                    >
-                      <Eye className="h-5 w-5" />
-                    </Button>
-                  </Link>
-                  <Button variant="ghost" size="sm">
-                    <MoreVertical className="h-5 w-5" />
-                  </Button>
-                </div>
               </div>
 
-              {/* Messages */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 dark:bg-gray-900">
-                {messages.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-full text-gray-500">
-                    <MessageCircle className="h-12 w-12 mb-4" />
-                    <p>No messages yet. Start the conversation!</p>
-                  </div>
-                ) : (
-                  messages.map((message) => (
-                    <div
-                      key={message.id}
-                      className={`flex ${
-                        message.senderid === user?.id
-                          ? "justify-end"
-                          : "justify-start"
-                      }`}
-                    >
-                      <div
-                        className={`flex items-start space-x-2 max-w-xs sm:max-w-md lg:max-w-lg xl:max-w-xl ${
-                          message.senderid === user?.id
-                            ? "flex-row-reverse space-x-reverse"
-                            : ""
-                        }`}
-                      >
-                        <Avatar className="w-8 h-8 mt-1">
-                          <AvatarFallback>
-                            {message.senderid === user?.id ? (
-                              <div className="bg-blue-500 rounded-full w-full h-full flex items-center justify-center text-white">
-                                <User className="h-4 w-4" />
-                              </div>
-                            ) : (
-                              message.sender?.username
-                                ?.charAt(0)
-                                .toUpperCase() || "U"
-                            )}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div
-                          className={`rounded-2xl px-4 py-3 ${
-                            message.senderid === user?.id
-                              ? "bg-blue-600 text-white rounded-br-none shadow-md"
-                              : "bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-bl-none border border-gray-200 dark:border-gray-600 shadow-sm"
-                          }`}
-                        >
-                          {renderMessageContent(message)}
-                          <p
-                            className={`text-xs mt-1 ${
-                              message.senderid === user?.id
-                                ? "text-blue-100"
-                                : "text-gray-500 dark:text-gray-400"
-                            }`}
-                          >
-                            {formatTime(message.timestamp)}
-                          </p>
+              {/* Messages - Scrollable */}
+              <div className="flex-1 overflow-y-auto p-4 bg-gray-50 dark:bg-gray-900">
+                {messagesLoading ? (
+                  <div className="space-y-4">
+                    {[1, 2, 3, 4].map((i) => (
+                      <div key={i} className={`flex gap-2 ${i % 2 === 0 ? 'flex-row-reverse' : 'flex-row'}`}>
+                        <div className="h-8 w-8 bg-gray-300 dark:bg-gray-600 rounded-full animate-pulse"></div>
+                        <div className={`flex flex-col ${i % 2 === 0 ? 'items-end' : 'items-start'}`}>
+                          <div className={`h-16 ${i % 2 === 0 ? 'bg-primary/20' : 'bg-gray-200 dark:bg-gray-700'} rounded-2xl w-48 animate-pulse`}></div>
+                          <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-16 mt-1 animate-pulse"></div>
                         </div>
                       </div>
+                    ))}
+                  </div>
+                ) : messages.length === 0 ? (
+                  <div className="flex items-center justify-center h-full text-muted-foreground">
+                    <div className="text-center">
+                      <MessageCircle className="h-16 w-16 mx-auto mb-4 opacity-30" />
+                      <p>No messages yet</p>
                     </div>
-                  ))
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {messages.map((message) => (
+                      <MessageBubble
+                        key={message.id}
+                        message={message}
+                        isOwnMessage={message.senderid === user?.id}
+                        senderName={message.sender?.username || user?.username || 'You'}
+                      />
+                    ))}
+                    <div ref={messagesEndRef} />
+                  </div>
                 )}
-                <div ref={messagesEndRef} />
               </div>
 
-              {/* Message Input */}
-              <div className="border-t border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-800">
-                <form onSubmit={sendMessage} className="flex space-x-2">
+              {/* Message Input - Fixed */}
+              <div className="flex-shrink-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4 shadow-sm">
+                <form onSubmit={handleSendMessage} className="flex gap-2">
                   <Input
                     type="text"
                     placeholder="Type your message..."
                     value={newMessage}
-                    onChange={(e) => {
-                      setNewMessage(e.target.value);
-                      if (selectedChat) {
-                        handleAdminTyping();
-                      }
-                    }}
-                    className="flex-1 py-3"
+                    onChange={(e) => setNewMessage(e.target.value)}
                     disabled={isSending}
-                    ref={inputRef}
+                    className="flex-1"
                   />
                   <Button
                     type="submit"
                     disabled={!newMessage.trim() || isSending}
-                    className="bg-blue-600 hover:bg-blue-700 py-3 px-4"
+                    className="bg-primary hover:bg-primary/90 px-6"
                   >
                     {isSending ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -694,26 +337,33 @@ export default function ChatDashboard() {
                 </form>
               </div>
             </>
+          ) : (
+            <div className="hidden lg:flex flex-1 items-center justify-center bg-gray-50 dark:bg-gray-900">
+              <div className="text-center p-8 animate-fadeIn">
+                <div className="relative inline-block mb-6">
+                  <MessageCircle className="h-24 w-24 text-muted-foreground opacity-30" />
+                </div>
+                <h3 className="text-2xl font-bold text-foreground mb-2">
+                  Select a conversation
+                </h3>
+                <p className="text-muted-foreground">
+                  Choose a customer from the list to view their messages
+                </p>
+              </div>
+            </div>
           )}
         </div>
-
-        {/* Show when no chat is selected */}
-        {!selectedChat && (
-          <div className="hidden md:flex flex-1 items-center justify-center bg-gray-50 dark:bg-gray-800">
-            <div className="text-center p-8">
-              <MessageCircle className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-xl font-medium text-gray-900 mb-2">
-                Select a conversation
-              </h3>
-              <p className="text-gray-500">
-                {user.role === "superadmin"
-                  ? "Choose a customer chat from the list to start messaging"
-                  : "Choose a customer from your showroom to start chatting"}
-              </p>
-            </div>
-          </div>
-        )}
       </div>
+
+      <style jsx>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateX(-10px); }
+          to { opacity: 1; transform: translateX(0); }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.3s ease-out forwards;
+        }
+      `}</style>
     </div>
   );
 }

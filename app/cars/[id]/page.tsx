@@ -99,8 +99,8 @@ export default function CarDetailsPage() {
     typeof (p as any).id === "string"
       ? (p as any).id
       : Array.isArray((p as any).id)
-      ? (p as any).id[0]
-      : undefined;
+        ? (p as any).id[0]
+        : undefined;
 
   const [car, setCar] = useState<Car | null>(null);
   const [selectedImage, setSelectedImage] = useState(0);
@@ -400,11 +400,10 @@ export default function CarDetailsPage() {
                   <button
                     key={index}
                     onClick={() => setSelectedImage(index)}
-                    className={`relative h-20 rounded-lg overflow-hidden border-2 transition-colors ${
-                      selectedImage === index
+                    className={`relative h-20 rounded-lg overflow-hidden border-2 transition-colors ${selectedImage === index
                         ? "border-blue-600"
                         : "border-gray-200"
-                    }`}
+                      }`}
                   >
                     <img
                       src={image}
@@ -490,12 +489,34 @@ export default function CarDetailsPage() {
             {/* Actions */}
             <div className="flex flex-wrap gap-3 sm:flex-nowrap">
               {user && car.adminid && user.id !== car.adminid && (
-                <Link href={`/chat/${car.id}`} className="flex-1">
-                  <Button className="w-full bg-blue-600 hover:bg-blue-700">
-                    <MessageCircle className="h-4 w-4 mr-2" />
-                    Chat with Dealer
-                  </Button>
-                </Link>
+                <Button
+                  className="flex-1 bg-blue-600 hover:bg-blue-700"
+                  onClick={async () => {
+                    try {
+                      const token = localStorage.getItem('token');
+                      const response = await fetch('/api/v2/chat/start-conversation', {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          Authorization: `Bearer ${token}`,
+                        },
+                        body: JSON.stringify({ carId: car.id }),
+                      });
+
+                      if (response.ok) {
+                        const data = await response.json();
+                        router.push('/user/chats');
+                      } else {
+                        console.error('Failed to start conversation');
+                      }
+                    } catch (error) {
+                      console.error('Error starting chat:', error);
+                    }
+                  }}
+                >
+                  <MessageCircle className="h-4 w-4 mr-2" />
+                  Chat with Dealer
+                </Button>
               )}
               {user && car.adminid && user.id !== car.adminid && (
                 <Button
@@ -518,7 +539,7 @@ export default function CarDetailsPage() {
                 </Button>
               )}
               {/* Show payment button only if user has an active booking for this car */}
-              {user && car.adminid && user.id !== car.adminid  && (
+              {user && car.adminid && user.id !== car.adminid && (
                 <Link href={`/payment/${car.id}`} className="flex-1">
                   <Button className="w-full bg-purple-600 hover:bg-purple-700">
                     <CreditCard className="h-4 w-4 mr-2" />
