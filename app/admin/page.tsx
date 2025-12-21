@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Car, Home, BarChart3, MessageCircle, Settings, Loader2, Trash2, Bell, Calendar, Phone, Mail, CreditCard, Upload } from 'lucide-react';
+import { Plus, Car, Home, BarChart3, MessageCircle, Settings, Loader2, Trash2, Bell, Calendar, Phone, Mail, CreditCard, Upload, Power } from 'lucide-react';
 import Link from 'next/link';
 import { useUser } from '@/context/user-context';
 import useRealtimeNotifications from '@/hooks/useRealtimeNotifications';
@@ -25,8 +25,8 @@ interface Room {
   description: string;
   location: string;
   image: string;
-  isActive: boolean;
-  createdAt: string;
+  is_active: boolean;
+  created_at: string;
 }
 
 interface Car {
@@ -287,7 +287,7 @@ export default function AdminDashboard() {
 
           // Fetch payment data
           try {
-            const paymentResponse = await fetch('/api/admin/payments', {
+            const paymentResponse = await fetch('/api/payments', {
               headers: { 'Authorization': `Bearer ${user?.token}` },
             });
 
@@ -308,8 +308,8 @@ export default function AdminDashboard() {
                 rejected,
               });
 
-              // Set recent payments (last 5)
-              setRecentPayments(payments.slice(0, 5));
+              // Set recent payments (last 10, most recent first)
+              setRecentPayments(payments.slice(0, 10));
             }
           } catch (paymentError) {
             console.error('Error fetching payment data:', paymentError);
@@ -357,6 +357,40 @@ export default function AdminDashboard() {
     } catch (error: any) {
       console.error('Error deleting room:', error);
       setError(error.message || 'Failed to delete showroom. Please try again.');
+    }
+  };
+
+  const toggleRoomStatus = async () => {
+    if (!room) return;
+
+    try {
+      const response = await fetch(`/api/rooms/${room.id}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user?.token}`,
+        },
+        body: JSON.stringify({
+          is_active: !room.is_active
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Failed to ${room.is_active ? 'deactivate' : 'activate'} showroom`);
+      }
+
+      const updatedRoom = await response.json();
+
+      // Update the local state
+      setRoom(updatedRoom);
+
+      // Show success message
+      toast.success(`Showroom ${updatedRoom.is_active ? 'activated' : 'deactivated'} successfully!`);
+    } catch (error: any) {
+      console.error('Error toggling room status:', error);
+      setError(error.message || 'Failed to update showroom status. Please try again.');
+      toast.error(error.message || 'Failed to update showroom status');
     }
   };
 
@@ -1095,16 +1129,41 @@ export default function AdminDashboard() {
                   <Link href={`/admin/edit-room/${room.id}`}>
                     <Button variant="outline" className="w-full sm:w-auto">
                       <Settings className="h-4 w-4 mr-2" />
-                      Edit Showroom
+                      <span className="hidden sm:inline">Edit Showroom</span>
+                      <span className="sm:hidden">Edit</span>
                     </Button>
                   </Link>
+                  <Button
+                    variant={room.is_active ? "outline" : "default"}
+                    onClick={toggleRoomStatus}
+                    className={`w-full sm:w-auto ${
+                      room.is_active
+                        ? "text-red-600 border-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                        : "text-green-600 border-green-600 hover:bg-green-50 dark:hover:bg-green-900/20"
+                    }`}
+                  >
+                    {room.is_active ? (
+                      <>
+                        <Power className="h-4 w-4 mr-2" />
+                        <span className="hidden sm:inline">Deactivate</span>
+                        <span className="sm:hidden">Off</span>
+                      </>
+                    ) : (
+                      <>
+                        <Power className="h-4 w-4 mr-2" />
+                        <span className="hidden sm:inline">Activate</span>
+                        <span className="sm:hidden">On</span>
+                      </>
+                    )}
+                  </Button>
                   <Button
                     variant="destructive"
                     onClick={handleDeleteRoom}
                     className="w-full sm:w-auto bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800"
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
-                    Delete
+                    <span className="hidden sm:inline">Delete</span>
+                    <span className="sm:hidden">Del</span>
                   </Button>
                 </div>
               </div>
@@ -1132,14 +1191,14 @@ export default function AdminDashboard() {
                     <p className="text-sm sm:text-base text-gray-700 dark:text-gray-300">{room.description}</p>
                     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 pt-4 border-t">
                       <span className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                        Created: {formatSafeDate(room.createdAt)}
+                        Created: {formatSafeDate(room.created_at)}
                       </span>
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${
-                        room.isActive
+                      <span className={`px-2 py-1 rounded text-xs sm:text-sm font-medium ${
+                        room.is_active
                           ? 'bg-green-100 text-green-800'
                           : 'bg-red-100 text-red-800'
                       }`}>
-                        {room.isActive ? 'Active' : 'Inactive'}
+                        {room.is_active ? 'Active' : 'Inactive'}
                       </span>
                     </div>
                   </div>

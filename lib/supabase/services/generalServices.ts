@@ -332,7 +332,7 @@ export const roomServices = {
 
   async updateRoomStatus(roomid: string, isActive: boolean): Promise<Room | null> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await getSupabaseServiceRole()
         .from('rooms')
         .update({ is_active: isActive })
         .eq('id', roomid)

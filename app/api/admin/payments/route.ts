@@ -231,10 +231,44 @@ export async function PUT(req: Request) {
       }
     }
 
-    return NextResponse.json({
-      message: 'Payment status updated successfully',
-      payment: updatedPayment
-    }, { status: 200 });
+    // Fetch the updated payment with user and car details
+    const updatedPaymentWithDetails = await paymentServices.getPaymentById(updatedPayment.id);
+    if (updatedPaymentWithDetails) {
+      // Get user details
+      const user = await userServices.getUserById(updatedPaymentWithDetails.user_id);
+
+      // Get booking details to get car ID
+      const booking = await bookingServices.getBookingById(updatedPaymentWithDetails.booking_id);
+      let carDetails = null;
+      if (booking && booking.carid) {
+        const { supabase } = await import('@/lib/supabase/client');
+        const { data: carData, error: carError } = await supabase
+          .from('cars')
+          .select('title, brand, model')
+          .eq('id', booking.carid)
+          .single();
+
+        if (!carError && carData) {
+          carDetails = { title: carData.title, brand: carData.brand, model: carData.model };
+        }
+      }
+
+      const paymentWithDetails = {
+        ...updatedPaymentWithDetails,
+        user: user ? { username: user.username, email: user.email } : undefined,
+        car: carDetails
+      };
+
+      return NextResponse.json({
+        message: 'Payment status updated successfully',
+        payment: paymentWithDetails
+      }, { status: 200 });
+    } else {
+      return NextResponse.json({
+        message: 'Payment status updated successfully',
+        payment: updatedPayment
+      }, { status: 200 });
+    }
   } catch (error: any) {
     console.error('Update payment status error:', error);
     return NextResponse.json(

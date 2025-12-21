@@ -46,7 +46,52 @@ export async function GET(request: Request, { params }: { params: { id: string }
       }
     }
 
-    return NextResponse.json({ payment }, { status: 200 });
+    // Get user details
+    const { supabase } = await import('@/lib/supabase/client');
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('id, username, email, phone')
+      .eq('id', payment.user_id)
+      .single();
+
+    // Get booking details to get car ID
+    const booking = await bookingServices.getBookingById(payment.booking_id);
+
+    let carDetails = null;
+    if (booking && booking.carid) {
+      const { data: carData, error: carError } = await supabase
+        .from('cars')
+        .select('id, title, brand, model, year')
+        .eq('id', booking.carid)
+        .single();
+
+      if (!carError && carData) {
+        carDetails = {
+          id: carData.id,
+          title: carData.title,
+          brand: carData.brand,
+          model: carData.model,
+          year: carData.year
+        };
+      }
+    }
+
+    // Combine payment data with user and car details
+    const paymentWithDetails = {
+      ...payment,
+      user: userData ? {
+        username: userData.username,
+        email: userData.email,
+        phone: userData.phone
+      } : undefined,
+      car: carDetails,
+      booking: booking ? {
+        start_date: booking.start_date,
+        end_date: booking.end_date
+      } : undefined
+    };
+
+    return NextResponse.json({ payment: paymentWithDetails }, { status: 200 });
 
   } catch (error: any) {
     console.error('Get payment API error:', error);

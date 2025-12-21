@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Camera,
   Upload,
@@ -499,9 +500,9 @@ export default function AdminPaymentsPage() {
 
     const searchLower = searchTerm.toLowerCase();
     return (
-      payment.car.title.toLowerCase().includes(searchLower) ||
-      payment.user.username.toLowerCase().includes(searchLower) ||
-      payment.user.email.toLowerCase().includes(searchLower) ||
+      (payment.car?.title || '').toLowerCase().includes(searchLower) ||
+      (payment.user?.username || '').toLowerCase().includes(searchLower) ||
+      (payment.user?.email || '').toLowerCase().includes(searchLower) ||
       payment.amount.toString().includes(searchLower)
     );
   });
@@ -557,30 +558,61 @@ export default function AdminPaymentsPage() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <Card className="bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-blue-800 dark:text-blue-200">{stats.total}</div>
-              <div className="text-sm text-blue-700 dark:text-blue-300">Total Payments</div>
-            </CardContent>
-          </Card>
-          <Card className="bg-yellow-50 dark:bg-yellow-950/30 border-yellow-200 dark:border-yellow-800">
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-yellow-800 dark:text-yellow-200">{stats.pending}</div>
-              <div className="text-sm text-yellow-700 dark:text-yellow-300">Pending</div>
-            </CardContent>
-          </Card>
-          <Card className="bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800">
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-green-800 dark:text-green-200">{stats.approved}</div>
-              <div className="text-sm text-green-700 dark:text-green-300">Approved</div>
-            </CardContent>
-          </Card>
-          <Card className="bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800">
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-red-800 dark:text-red-200">{stats.rejected}</div>
-              <div className="text-sm text-red-700 dark:text-red-300">Rejected</div>
-            </CardContent>
-          </Card>
+          {loading ? (
+            <>
+              <Card>
+                <CardContent className="p-4">
+                  <Skeleton className="h-8 w-16 mb-2" />
+                  <Skeleton className="h-4 w-24" />
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <Skeleton className="h-8 w-16 mb-2" />
+                  <Skeleton className="h-4 w-24" />
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <Skeleton className="h-8 w-16 mb-2" />
+                  <Skeleton className="h-4 w-24" />
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <Skeleton className="h-8 w-16 mb-2" />
+                  <Skeleton className="h-4 w-24" />
+                </CardContent>
+              </Card>
+            </>
+          ) : (
+            <>
+              <Card className="bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
+                <CardContent className="p-4">
+                  <div className="text-2xl font-bold text-blue-800 dark:text-blue-200">{stats.total}</div>
+                  <div className="text-sm text-blue-700 dark:text-blue-300">Total Payments</div>
+                </CardContent>
+              </Card>
+              <Card className="bg-yellow-50 dark:bg-yellow-950/30 border-yellow-200 dark:border-yellow-800">
+                <CardContent className="p-4">
+                  <div className="text-2xl font-bold text-yellow-800 dark:text-yellow-200">{stats.pending}</div>
+                  <div className="text-sm text-yellow-700 dark:text-yellow-300">Pending</div>
+                </CardContent>
+              </Card>
+              <Card className="bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800">
+                <CardContent className="p-4">
+                  <div className="text-2xl font-bold text-green-800 dark:text-green-200">{stats.approved}</div>
+                  <div className="text-sm text-green-700 dark:text-green-300">Approved</div>
+                </CardContent>
+              </Card>
+              <Card className="bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800">
+                <CardContent className="p-4">
+                  <div className="text-2xl font-bold text-red-800 dark:text-red-200">{stats.rejected}</div>
+                  <div className="text-sm text-red-700 dark:text-red-300">Rejected</div>
+                </CardContent>
+              </Card>
+            </>
+          )}
         </div>
 
         {/* Search and Filter */}
@@ -612,8 +644,53 @@ export default function AdminPaymentsPage() {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <div className="flex justify-center items-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+              <div className="space-y-4">
+                {/* Skeleton for table header */}
+                <div className="hidden md:table-header-group">
+                  <div className="flex space-x-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-t-lg">
+                    <Skeleton className="h-4 w-16" />
+                    <Skeleton className="h-4 w-20" />
+                    <Skeleton className="h-4 w-16" />
+                    <Skeleton className="h-4 w-16" />
+                    <Skeleton className="h-4 w-16" />
+                    <Skeleton className="h-4 w-20" />
+                    <Skeleton className="h-4 w-16" />
+                  </div>
+                </div>
+
+                {/* Skeleton rows */}
+                {[...Array(5)].map((_, index) => (
+                  <div key={index} className="flex flex-col md:table-row border-b border-gray-200 dark:border-gray-700 p-4 animate-pulse">
+                    <div className="mb-2 md:mb-0 md:w-1/6">
+                      <Skeleton className="h-4 w-3/4" />
+                      <Skeleton className="h-3 w-1/2 mt-1" />
+                    </div>
+                    <div className="mb-2 md:mb-0 md:w-1/6">
+                      <Skeleton className="h-4 w-3/4" />
+                      <Skeleton className="h-3 w-1/2 mt-1" />
+                    </div>
+                    <div className="mb-2 md:mb-0 md:w-1/6">
+                      <Skeleton className="h-4 w-3/4" />
+                    </div>
+                    <div className="mb-2 md:mb-0 md:w-1/6">
+                      <Skeleton className="h-4 w-3/4" />
+                    </div>
+                    <div className="mb-2 md:mb-0 md:w-1/6">
+                      <Skeleton className="h-4 w-3/4" />
+                    </div>
+                    <div className="mb-2 md:mb-0 md:w-1/6">
+                      <Skeleton className="h-4 w-3/4" />
+                    </div>
+                    <div className="mb-2 md:mb-0 md:w-1/6">
+                      <div className="flex space-x-2">
+                        <Skeleton className="h-8 w-16" />
+                        <Skeleton className="h-8 w-16" />
+                        <Skeleton className="h-8 w-16" />
+                        <Skeleton className="h-8 w-16" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : filteredPayments.length === 0 ? (
               <div className="text-center py-12">
@@ -656,18 +733,18 @@ export default function AdminPaymentsPage() {
                       <tr key={payment.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-medium text-gray-900 dark:text-white">
-                            {payment.car.title}
+                            {payment.car?.title || 'N/A'}
                           </div>
                           <div className="text-sm text-gray-500 dark:text-gray-400">
-                            {payment.car.brand} {payment.car.model}
+                            {payment.car?.brand || ''} {payment.car?.model || ''}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900 dark:text-white">
-                            {payment.user.username}
+                            {payment.user?.username || 'N/A'}
                           </div>
                           <div className="text-sm text-gray-500 dark:text-gray-400">
-                            {payment.user.email}
+                            {payment.user?.email || 'N/A'}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
@@ -793,11 +870,11 @@ export default function AdminPaymentsPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label>Customer</Label>
-                  <p className="text-sm text-gray-600 dark:text-gray-300">{selectedPayment.user.username}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">{selectedPayment.user?.username || 'N/A'}</p>
                 </div>
                 <div>
                   <Label>Car</Label>
-                  <p className="text-sm text-gray-600 dark:text-gray-300">{selectedPayment.car.title}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">{selectedPayment.car?.title || 'N/A'}</p>
                 </div>
                 <div>
                   <Label>Amount</Label>
@@ -908,11 +985,11 @@ export default function AdminPaymentsPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label>Customer</Label>
-                  <p className="text-sm text-gray-600 dark:text-gray-300">{selectedPayment.user.username}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">{selectedPayment.user?.username || 'N/A'}</p>
                 </div>
                 <div>
                   <Label>Car</Label>
-                  <p className="text-sm text-gray-600 dark:text-gray-300">{selectedPayment.car.title}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">{selectedPayment.car?.title || 'N/A'}</p>
                 </div>
                 <div>
                   <Label>Amount</Label>

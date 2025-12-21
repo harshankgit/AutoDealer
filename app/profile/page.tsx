@@ -75,19 +75,26 @@ export default function ProfilePage() {
   const [isSettingsLoading, setIsSettingsLoading] = useState(false);
 
   useEffect(() => {
-    fetchUserData();
-    if (user?.role === 'admin') {
-      fetchAdminStats();
-      fetchAdminPayments();
-    } else if (user?.role === 'superadmin') {
-      // Super admin has access to all data, but we'll load default settings
-      fetchSuperAdminSettings();
-      fetchSuperAdminBookings(); // Fetch all admin bookings
-    } else {
-      fetchBookingStats();
-      fetchBookings();
-      fetchUserPayments();
-    }
+    const loadUserData = async () => {
+      await fetchUserData();
+      if (user?.role === 'admin') {
+        await fetchAdminStats();
+        await fetchAdminPayments();
+        setLoading(false); // Set loading to false after all admin data is loaded
+      } else if (user?.role === 'superadmin') {
+        // Super admin has access to all data, but we'll load default settings
+        await fetchSuperAdminSettings();
+        await fetchSuperAdminBookings(); // Fetch all admin bookings
+        setLoading(false); // Set loading to false after all superadmin data is loaded
+      } else {
+        await fetchBookingStats();
+        await fetchBookings();
+        await fetchUserPayments();
+        setLoading(false); // Set loading to false after all user data is loaded
+      }
+    };
+
+    loadUserData();
   }, [user]);
 
   const fetchSuperAdminBookings = async () => {
@@ -118,6 +125,8 @@ export default function ProfilePage() {
       console.error('Error fetching super admin bookings:', error);
       toast.error('Failed to fetch bookings');
       setBookings([]);
+    } finally {
+      setLoading(false); // Set loading to false after data is fetched
     }
   };
 
@@ -249,8 +258,6 @@ export default function ProfilePage() {
       }
     } catch (error) {
       console.error('Error fetching admin stats:', error);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -342,8 +349,6 @@ export default function ProfilePage() {
       }
     } catch (error) {
       console.error('Error fetching bookings:', error);
-    } finally {
-      setLoading(false);
     }
   };
 

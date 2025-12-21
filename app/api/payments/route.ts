@@ -181,21 +181,21 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // For regular users: get their own payments
+    // For regular users: get their own payments with car details
     if (decoded.role === 'user') {
-      const payments = await paymentServices.getPaymentsByUser(decoded.userId, token);
+      const payments = await paymentServices.getPaymentsWithDetailsByUser(decoded.userId, token);
       return NextResponse.json({ payments }, { status: 200 });
     }
     
-    // For superadmins: get all payments
+    // For superadmins: get all payments with user and car details
     if (decoded.role === 'superadmin') {
-      const payments = await paymentServices.getAllPayments();
+      const payments = await paymentServices.getPaymentsWithDetails();
       return NextResponse.json({ payments }, { status: 200 });
     }
-    
-    // For admins: get payments for their bookings
+
+    // For admins: get payments for their bookings with user and car details
     if (decoded.role === 'admin') {
-      const payments = await paymentServices.getPaymentsByAdmin(decoded.userId);
+      const payments = await paymentServices.getPaymentsWithDetailsByAdmin(decoded.userId);
       return NextResponse.json({ payments }, { status: 200 });
     }
     

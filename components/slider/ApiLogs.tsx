@@ -262,20 +262,29 @@ const ApiLogs: React.FC = () => {
 
   return (
     <div className="w-full">
-      <Card className="p-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+      <Card className="p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 gap-4">
           <div>
-            <CardTitle className="text-2xl">API Logs</CardTitle>
-            <CardDescription className="mt-1">
+            <CardTitle className="text-xl sm:text-2xl">API Logs</CardTitle>
+            <CardDescription className="mt-1 text-sm">
               Monitor all API requests and their performance
             </CardDescription>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={clearLogs}>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={clearLogs}
+              className="w-full sm:w-auto"
+            >
               <RotateCcw className="h-4 w-4 mr-2" />
-              Clear Old Logs
+              Clear Logs
             </Button>
-            <Button variant="outline" size="sm">
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full sm:w-auto"
+            >
               <Download className="h-4 w-4 mr-2" />
               Export
             </Button>
@@ -283,27 +292,27 @@ const ApiLogs: React.FC = () => {
         </div>
 
         {/* Tabs for Success/Error/All */}
-        <Tabs value={activeTab} onValueChange={(value: string) => setActiveTab(value as 'all' | 'success' | 'error')} className="mb-6">
+        <Tabs value={activeTab} onValueChange={(value: string) => setActiveTab(value as 'all' | 'success' | 'error')} className="mb-4 sm:mb-6">
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="all">All Logs ({logs.length})</TabsTrigger>
+            <TabsTrigger value="all">All ({logs.length})</TabsTrigger>
             <TabsTrigger value="success">Success ({successLogs.length})</TabsTrigger>
             <TabsTrigger value="error">Errors ({errorLogs.length})</TabsTrigger>
           </TabsList>
         </Tabs>
 
-        {/* Filters */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-6">
-          <div>
+        {/* Filters - Responsive Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 mb-4 sm:mb-6">
+          <div className="min-w-0">
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">Method</label>
             <Select
               value={filters.method || 'all'}
               onValueChange={(value) => handleFilterChange('method', value === 'all' ? '' : value)}
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="All Methods" />
+                <SelectValue placeholder="All" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Methods</SelectItem>
+                <SelectItem value="all">All</SelectItem>
                 <SelectItem value="GET">GET</SelectItem>
                 <SelectItem value="POST">POST</SelectItem>
                 <SelectItem value="PUT">PUT</SelectItem>
@@ -313,29 +322,29 @@ const ApiLogs: React.FC = () => {
             </Select>
           </div>
 
-          <div>
+          <div className="min-w-0">
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">Status</label>
             <Select
               value={filters.statusCode}
               onValueChange={(value) => handleFilterChange('statusCode', value === 'all' ? '' : value)}
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="All Statuses" />
+                <SelectValue placeholder="All" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="200">200 - OK</SelectItem>
-                <SelectItem value="201">201 - Created</SelectItem>
-                <SelectItem value="400">400 - Bad Request</SelectItem>
-                <SelectItem value="401">401 - Unauthorized</SelectItem>
-                <SelectItem value="403">403 - Forbidden</SelectItem>
-                <SelectItem value="404">404 - Not Found</SelectItem>
-                <SelectItem value="500">500 - Server Error</SelectItem>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="200">200</SelectItem>
+                <SelectItem value="201">201</SelectItem>
+                <SelectItem value="400">400</SelectItem>
+                <SelectItem value="401">401</SelectItem>
+                <SelectItem value="403">403</SelectItem>
+                <SelectItem value="404">404</SelectItem>
+                <SelectItem value="500">500</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          <div>
+          <div className="min-w-0">
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">Start Date</label>
             <Input
               type="date"
@@ -345,7 +354,7 @@ const ApiLogs: React.FC = () => {
             />
           </div>
 
-          <div>
+          <div className="min-w-0">
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">End Date</label>
             <Input
               type="date"
@@ -355,12 +364,12 @@ const ApiLogs: React.FC = () => {
             />
           </div>
 
-          <div>
+          <div className="min-w-0">
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">Endpoint</label>
             <div className="relative">
               <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
-                placeholder="Search endpoint..."
+                placeholder="Search..."
                 value={filters.endpoint}
                 onChange={(e) => handleFilterChange('endpoint', e.target.value)}
                 className="pl-8 w-full"
@@ -368,50 +377,49 @@ const ApiLogs: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-end">
-            <div className="flex gap-2 w-full">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={applyFilters}
-                className="flex-1"
-              >
-                <Filter className="h-4 w-4 mr-2" />
-                Apply
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={clearFilters}
-                className="flex-1"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
+          <div className="flex flex-col gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={applyFilters}
+              className="flex-1"
+            >
+              <Filter className="h-4 w-4 mr-2" />
+              Apply
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={clearFilters}
+              className="flex-1"
+            >
+              <X className="h-4 w-4" />
+              Clear
+            </Button>
           </div>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
-            <div className="text-sm text-blue-600 dark:text-blue-400">Total Requests</div>
-            <div className="text-2xl font-bold">{pagination?.totalLogs || 0}</div>
+        {/* Stats - Responsive Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
+          <div className="bg-blue-50 dark:bg-blue-900/20 p-3 sm:p-4 rounded-lg">
+            <div className="text-xs sm:text-sm text-blue-600 dark:text-blue-400">Total Requests</div>
+            <div className="text-lg sm:text-2xl font-bold">{pagination?.totalLogs || 0}</div>
           </div>
-          <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
-            <div className="text-sm text-green-600 dark:text-green-400">Success</div>
-            <div className="text-2xl font-bold">
+          <div className="bg-green-50 dark:bg-green-900/20 p-3 sm:p-4 rounded-lg">
+            <div className="text-xs sm:text-sm text-green-600 dark:text-green-400">Success</div>
+            <div className="text-lg sm:text-2xl font-bold">
               {successLogs.length}
             </div>
           </div>
-          <div className="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg">
-            <div className="text-sm text-yellow-600 dark:text-yellow-400">Client Errors</div>
-            <div className="text-2xl font-bold">
+          <div className="bg-yellow-50 dark:bg-yellow-900/20 p-3 sm:p-4 rounded-lg">
+            <div className="text-xs sm:text-sm text-yellow-600 dark:text-yellow-400">Client Errors</div>
+            <div className="text-lg sm:text-2xl font-bold">
               {logs.filter(log => log.status_code >= 400 && log.status_code < 500).length}
             </div>
           </div>
-          <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg">
-            <div className="text-sm text-red-600 dark:text-red-400">Server Errors</div>
-            <div className="text-2xl font-bold">
+          <div className="bg-red-50 dark:bg-red-900/20 p-3 sm:p-4 rounded-lg">
+            <div className="text-xs sm:text-sm text-red-600 dark:text-red-400">Server Errors</div>
+            <div className="text-lg sm:text-2xl font-bold">
               {logs.filter(log => log.status_code >= 500).length}
             </div>
           </div>
@@ -419,7 +427,7 @@ const ApiLogs: React.FC = () => {
 
         {/* Error message */}
         {error && (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded mb-4">
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded mb-4 text-sm">
             {error}
           </div>
         )}
@@ -428,87 +436,89 @@ const ApiLogs: React.FC = () => {
         {loading && (
           <div className="space-y-4">
             {/* Stats skeleton */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-              <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
-                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-2"></div>
-                <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
+              <div className="bg-blue-50 dark:bg-blue-900/20 p-3 sm:p-4 rounded-lg">
+                <div className="h-3 sm:h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-2"></div>
+                <div className="h-5 sm:h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
               </div>
-              <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
-                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-2"></div>
-                <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+              <div className="bg-green-50 dark:bg-green-900/20 p-3 sm:p-4 rounded-lg">
+                <div className="h-3 sm:h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-2"></div>
+                <div className="h-5 sm:h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
               </div>
-              <div className="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg">
-                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-2"></div>
-                <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 p-3 sm:p-4 rounded-lg">
+                <div className="h-3 sm:h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-2"></div>
+                <div className="h-5 sm:h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
               </div>
-              <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg">
-                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-2"></div>
-                <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+              <div className="bg-red-50 dark:bg-red-900/20 p-3 sm:p-4 rounded-lg">
+                <div className="h-3 sm:h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-2"></div>
+                <div className="h-5 sm:h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
               </div>
             </div>
 
             {/* Table skeleton */}
-            <div className="rounded-md border mb-4">
-              <div className="p-4 border-b">
-                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
-              </div>
-              <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                {[...Array(5)].map((_, i) => (
-                  <div key={i} className="flex items-center p-4">
-                    <div className="w-[100px]">
-                      <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-12"></div>
+            <div className="rounded-md border mb-4 overflow-x-auto">
+              <div className="min-w-full inline-block align-middle">
+                <div className="p-4 border-b">
+                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
+                </div>
+                <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} className="flex items-center p-4">
+                      <div className="w-[80px] sm:w-[100px]">
+                        <div className="h-5 sm:h-6 bg-gray-200 dark:bg-gray-700 rounded w-10 sm:w-12"></div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+                      </div>
+                      <div className="w-16 sm:w-20">
+                        <div className="h-5 sm:h-6 bg-gray-200 dark:bg-gray-700 rounded w-12 sm:w-16"></div>
+                      </div>
+                      <div className="w-16 sm:w-20">
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-10 sm:w-12"></div>
+                      </div>
+                      <div className="w-24 sm:w-32">
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16 sm:w-20"></div>
+                      </div>
+                      <div className="w-28 sm:w-40">
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20 sm:w-24"></div>
+                      </div>
                     </div>
-                    <div className="flex-1">
-                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
-                    </div>
-                    <div className="w-20">
-                      <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
-                    </div>
-                    <div className="w-20">
-                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-12"></div>
-                    </div>
-                    <div className="w-32">
-                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20"></div>
-                    </div>
-                    <div className="w-40">
-                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24"></div>
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             </div>
 
             {/* Pagination skeleton */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3 sm:w-1/4 text-sm"></div>
               <div className="flex items-center gap-2">
-                <div className="h-8 w-20 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
-                <div className="h-8 w-20 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                <div className="h-8 w-16 sm:w-20 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-12 sm:w-16 text-sm"></div>
+                <div className="h-8 w-16 sm:w-20 bg-gray-200 dark:bg-gray-700 rounded"></div>
               </div>
             </div>
           </div>
         )}
 
-        {/* Logs table */}
+        {/* Logs table - Responsive with horizontal scroll */}
         {!loading && !error && (
           <>
-            <div className="rounded-md border mb-4">
-              <Table>
+            <div className="rounded-md border mb-4 overflow-x-auto">
+              <Table className="min-w-full">
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[100px]">Method</TableHead>
+                    <TableHead className="w-[80px] sm:w-[100px]">Method</TableHead>
                     <TableHead>Endpoint</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Time</TableHead>
-                    <TableHead>IP Address</TableHead>
+                    <TableHead>IP</TableHead>
                     <TableHead>Date</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {currentLogs.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                      <TableCell colSpan={6} className="text-center py-8 text-gray-500 text-sm">
                         No logs found
                       </TableCell>
                     </TableRow>
@@ -516,11 +526,11 @@ const ApiLogs: React.FC = () => {
                     currentLogs.map((log) => (
                       <TableRow key={log.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
                         <TableCell>
-                          <Badge variant={getMethodBadgeVariant(log.method)} className="capitalize">
+                          <Badge variant={getMethodBadgeVariant(log.method)} className="capitalize text-xs sm:text-sm">
                             {log.method}
                           </Badge>
                         </TableCell>
-                        <TableCell className="font-mono text-sm max-w-xs truncate">
+                        <TableCell className="font-mono text-xs sm:text-sm max-w-[120px] sm:max-w-xs truncate">
                           {log.endpoint}
                         </TableCell>
                         <TableCell>
@@ -528,26 +538,26 @@ const ApiLogs: React.FC = () => {
                             {getStatusIcon(log.status_code)}
                             <Badge
                               variant={getStatusBadgeVariant(log.status_code)}
-                              className="font-mono"
+                              className="font-mono text-xs sm:text-sm"
                             >
                               {log.status_code}
                             </Badge>
                           </div>
                         </TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-1">
-                            <Clock className="h-4 w-4 text-gray-400" />
+                          <div className="flex items-center gap-1 text-xs sm:text-sm">
+                            <Clock className="h-3 sm:h-4 w-3 sm:w-4 text-gray-400" />
                             {formatResponseTime(log.response_time_ms)}
                           </div>
                         </TableCell>
                         <TableCell>
-                          <span className="font-mono text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">
+                          <span className="font-mono text-xs bg-gray-100 dark:bg-gray-800 px-1 sm:px-2 py-1 rounded">
                             {log.ip_address || 'N/A'}
                           </span>
                         </TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-1">
-                            <Calendar className="h-4 w-4 text-gray-400" />
+                          <div className="flex items-center gap-1 text-xs sm:text-sm">
+                            <Calendar className="h-3 sm:h-4 w-3 sm:w-4 text-gray-400" />
                             {formatDate(log.created_at)}
                           </div>
                         </TableCell>
@@ -561,19 +571,20 @@ const ApiLogs: React.FC = () => {
             {/* Pagination */}
             {pagination && (
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="text-sm text-gray-500 dark:text-gray-400">
+                <div className="text-sm text-gray-500 dark:text-gray-400 text-center sm:text-left">
                   Showing {currentLogs.length} of {pagination.totalLogs} logs
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row items-center gap-2">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => handlePageChange(currentPage - 1)}
                     disabled={!pagination.hasPrevPage}
+                    className="w-full sm:w-auto"
                   >
                     Previous
                   </Button>
-                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                  <div className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
                     Page {currentPage} of {pagination.totalPages}
                   </div>
                   <Button
@@ -581,6 +592,7 @@ const ApiLogs: React.FC = () => {
                     size="sm"
                     onClick={() => handlePageChange(currentPage + 1)}
                     disabled={!pagination.hasNextPage}
+                    className="w-full sm:w-auto"
                   >
                     Next
                   </Button>

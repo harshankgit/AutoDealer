@@ -1,12 +1,7 @@
 import { NextRequest } from 'next/server';
 import { logApi } from '@/lib/apiLogger';
-import { createClient } from '@supabase/supabase-js';
 import { verify } from 'jsonwebtoken';
-
-// Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { getSupabaseServiceRole } from '@/lib/supabase/server';
 
 // Helper function to verify JWT token and get user info
 const verifyToken = (token: string) => {
@@ -71,16 +66,15 @@ export async function GET(request: NextRequest) {
 
   try {
     // Get all scanner images with admin and room information
-    const { data, error } = await supabase
+    const { data, error } = await getSupabaseServiceRole()
       .from('scanner_images')
       .select(`
         id,
-        admin_id,
-        room_id,
+        adminid,
+        roomid,
         image_url,
         uploaded_at,
-        admin:adminid(username, email),
-        room:roomid(name)
+        users:adminid(username, email)
       `)
       .order('uploaded_at', { ascending: false });
 
@@ -90,9 +84,40 @@ export async function GET(request: NextRequest) {
       return Response.json({ error: 'Failed to fetch scanner images' }, { status: 500 });
     }
 
-    const response = Response.json({ 
-      scanners: data || [],
-      count: data?.length || 0
+    // Get room information for all scanner images
+    const roomIds = Array.from(new Set(data.map(scanner => scanner.roomid).filter(id => id)));
+    let roomMap: Record<string, any> = {};
+
+    if (roomIds.length > 0) {
+      const { data: roomsData, error: roomsError } = await getSupabaseServiceRole()
+        .from('rooms')
+        .select('id, name, location')
+        .in('id', roomIds);
+
+      if (!roomsError && roomsData) {
+        roomMap = roomsData.reduce((acc, room) => {
+          acc[room.id] = room;
+          return acc;
+        }, {} as Record<string, any>);
+      }
+    }
+
+    // Transform the data to include room information
+    const transformedScanners = data.map(scanner => ({
+      id: scanner.id,
+      adminid: scanner.adminid,
+      roomid: scanner.roomid,
+      image_url: scanner.image_url,
+      uploaded_at: scanner.uploaded_at,
+      admin_username: (scanner.users as any)?.username || 'Unknown Admin',
+      room_name: roomMap[scanner.roomid as string]?.name || 'Unknown Room',
+      admin: scanner.users,
+      room: roomMap[scanner.roomid as string] || null
+    }));
+
+    const response = Response.json({
+      scanners: transformedScanners,
+      count: transformedScanners.length
     });
     
     await logApiCall(request, response.status, userId, startTime);

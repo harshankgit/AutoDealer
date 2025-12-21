@@ -19,6 +19,15 @@ export interface Payment {
   expected_delivery_date: string | null;
   created_at: string;
   updated_at: string;
+  user?: {
+    username: string;
+    email: string;
+  };
+  car?: {
+    title: string;
+    brand: string;
+    model: string;
+  };
 }
 
 // Payment Service Functions
@@ -284,6 +293,297 @@ export const paymentServices = {
     } catch (error) {
       console.error('Error in deletePayment:', error);
       return false;
+    }
+  },
+
+  // Get payments with user and car details
+  async getPaymentsWithDetails(): Promise<Payment[]> {
+    try {
+      // First, get all payments
+      const { data: paymentsData, error: paymentsError } = await getSupabaseServiceRole()
+        .from('payments')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (paymentsError) {
+        console.error('Error getting payments:', paymentsError);
+        return [];
+      }
+
+      if (!paymentsData || paymentsData.length === 0) {
+        return [];
+      }
+
+      // Get unique user IDs and booking IDs to fetch user and booking details in batches
+      const userIds = Array.from(new Set(paymentsData.map(p => p.user_id)));
+      const bookingIds = Array.from(new Set(paymentsData.map(p => p.booking_id)));
+
+      // Get user details
+      const { data: usersData, error: usersError } = await getSupabaseServiceRole()
+        .from('users')
+        .select('id, username, email')
+        .in('id', userIds);
+
+      if (usersError) {
+        console.error('Error getting user details:', usersError);
+        return paymentsData as Payment[];
+      }
+
+      // Get bookings to get car IDs
+      const { data: bookingsData, error: bookingsError } = await getSupabaseServiceRole()
+        .from('bookings')
+        .select('id, carid')
+        .in('id', bookingIds);
+
+      if (bookingsError) {
+        console.error('Error getting booking details:', bookingsError);
+        return paymentsData as Payment[];
+      }
+
+      // Get unique car IDs from bookings
+      const carIds = Array.from(new Set(bookingsData.filter(b => b.carid).map(b => b.carid)));
+
+      // Get car details
+      const { data: carsData, error: carsError } = await getSupabaseServiceRole()
+        .from('cars')
+        .select('id, title, brand, model')
+        .in('id', carIds);
+
+      if (carsError) {
+        console.error('Error getting car details:', carsError);
+        return paymentsData as Payment[];
+      }
+
+      // Create lookup maps for efficient data matching
+      const userMap = new Map(usersData.map(u => [u.id, { username: u.username, email: u.email }]));
+      const bookingMap = new Map(bookingsData.map(b => [b.id, b.carid]));
+      const carMap = new Map(carsData.map(c => [c.id, { title: c.title, brand: c.brand, model: c.model }]));
+
+      // Combine payment data with user and car details
+      const paymentsWithDetails = paymentsData.map(payment => {
+        const user = userMap.get(payment.user_id);
+        const carId = bookingMap.get(payment.booking_id);
+        const car = carId ? carMap.get(carId) : undefined;
+
+        return {
+          ...payment,
+          user,
+          car
+        } as Payment;
+      });
+
+      return paymentsWithDetails;
+    } catch (error) {
+      console.error('Error in getPaymentsWithDetails:', error);
+      return [];
+    }
+  },
+
+  // Get payments with user and car details for a specific user
+  async getPaymentsWithDetailsByUser(userId: string, userToken?: string): Promise<Payment[]> {
+    try {
+      let supabaseClient;
+      if (userToken) {
+        // Create client scoped with user token for RLS enforcement
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+        const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+        supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+          global: {
+            headers: { Authorization: `Bearer ${userToken}` },
+          },
+        });
+      } else {
+        // Use regular client but explicitly filter by user ID
+        supabaseClient = supabase;
+      }
+
+      const { data: paymentsData, error: paymentsError } = await supabaseClient
+        .from('payments')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (paymentsError) {
+        console.error('Error getting payments by user:', paymentsError);
+        return [];
+      }
+
+      if (!paymentsData || paymentsData.length === 0) {
+        return [];
+      }
+
+      // Get unique booking IDs to fetch booking details
+      const bookingIds = Array.from(new Set(paymentsData.map(p => p.booking_id)));
+
+      // Get bookings to get car IDs
+      const { data: bookingsData, error: bookingsError } = await getSupabaseServiceRole()
+        .from('bookings')
+        .select('id, carid')
+        .in('id', bookingIds);
+
+      if (bookingsError) {
+        console.error('Error getting booking details:', bookingsError);
+        return paymentsData as Payment[];
+      }
+
+      // Get unique car IDs from bookings
+      const carIds = Array.from(new Set(bookingsData.filter(b => b.carid).map(b => b.carid)));
+
+      // Get car details
+      const { data: carsData, error: carsError } = await getSupabaseServiceRole()
+        .from('cars')
+        .select('id, title, brand, model')
+        .in('id', carIds);
+
+      if (carsError) {
+        console.error('Error getting car details:', carsError);
+        return paymentsData as Payment[];
+      }
+
+      // Create lookup maps for efficient data matching
+      const bookingMap = new Map(bookingsData.map(b => [b.id, b.carid]));
+      const carMap = new Map(carsData.map(c => [c.id, { title: c.title, brand: c.brand, model: c.model }]));
+
+      // Combine payment data with user and car details
+      const paymentsWithDetails = paymentsData.map(payment => {
+        const user = { username: 'You', email: 'user@example.com' }; // User's own data would come from token
+        const carId = bookingMap.get(payment.booking_id);
+        const car = carId ? carMap.get(carId) : undefined;
+
+        return {
+          ...payment,
+          user,
+          car
+        } as Payment;
+      });
+
+      return paymentsWithDetails;
+    } catch (error) {
+      console.error('Error in getPaymentsWithDetailsByUser:', error);
+      return [];
+    }
+  },
+
+  // Get payments with user and car details for admin
+  async getPaymentsWithDetailsByAdmin(adminId: string): Promise<Payment[]> {
+    try {
+      // Get rooms for the admin
+      const { data: roomsData, error: roomsError } = await getSupabaseServiceRole()
+        .from('rooms')
+        .select('id')
+        .eq('adminid', adminId);
+
+      if (roomsError) {
+        console.error('Error getting rooms for admin:', roomsError);
+        return [];
+      }
+
+      if (!roomsData || roomsData.length === 0) {
+        console.log('No rooms found for admin:', adminId);
+        return [];
+      }
+
+      const roomIds = roomsData.map(room => room.id);
+
+      // Get cars in admin's rooms
+      const { data: carsData, error: carsError } = await getSupabaseServiceRole()
+        .from('cars')
+        .select('id')
+        .in('roomid', roomIds);
+
+      if (carsError) {
+        console.error('Error getting cars for admin:', carsError);
+        return [];
+      }
+
+      if (!carsData || carsData.length === 0) {
+        console.log('No cars found for admin:', adminId);
+        return [];
+      }
+
+      const carIds = carsData.map(car => car.id);
+
+      // Get bookings for admin's cars
+      const { data: bookingsData, error: bookingsError } = await getSupabaseServiceRole()
+        .from('bookings')
+        .select('id, carid')
+        .in('carid', carIds);
+
+      if (bookingsError) {
+        console.error('Error getting bookings for admin:', bookingsError);
+        return [];
+      }
+
+      if (!bookingsData || bookingsData.length === 0) {
+        console.log('No bookings found for admin:', adminId);
+        return [];
+      }
+
+      const bookingIds = bookingsData.map(booking => booking.id);
+
+      // Finally, get payments for those bookings
+      const { data: paymentsData, error: paymentsError } = await getSupabaseServiceRole()
+        .from('payments')
+        .select('*')
+        .in('booking_id', bookingIds)
+        .order('created_at', { ascending: false });
+
+      if (paymentsError) {
+        console.error('Error getting payments by admin:', paymentsError);
+        return [];
+      }
+
+      // Get unique user IDs to fetch user details
+      const userIds = Array.from(new Set(paymentsData.map(p => p.user_id)));
+
+      // Get user details
+      const { data: usersData, error: usersError } = await getSupabaseServiceRole()
+        .from('users')
+        .select('id, username, email')
+        .in('id', userIds);
+
+      if (usersError) {
+        console.error('Error getting user details:', usersError);
+        return paymentsData as Payment[];
+      }
+
+      // Get unique car IDs from bookings
+      const carIdsForDetails = Array.from(new Set(bookingsData.filter(b => b.carid).map(b => b.carid)));
+
+      // Get car details
+      const { data: carsDetailsData, error: carsDetailsError } = await getSupabaseServiceRole()
+        .from('cars')
+        .select('id, title, brand, model')
+        .in('id', carIdsForDetails);
+
+      if (carsDetailsError) {
+        console.error('Error getting car details:', carsDetailsError);
+        return paymentsData as Payment[];
+      }
+
+      // Create lookup maps for efficient data matching
+      const userMap = new Map(usersData.map(u => [u.id, { username: u.username, email: u.email }]));
+      const bookingMap = new Map(bookingsData.map(b => [b.id, b.carid]));
+      const carMap = new Map(carsDetailsData.map(c => [c.id, { title: c.title, brand: c.brand, model: c.model }]));
+
+      // Combine payment data with user and car details
+      const paymentsWithDetails = paymentsData.map(payment => {
+        const user = userMap.get(payment.user_id);
+        const carId = bookingMap.get(payment.booking_id);
+        const car = carId ? carMap.get(carId) : undefined;
+
+        return {
+          ...payment,
+          user,
+          car
+        } as Payment;
+      });
+
+      return paymentsWithDetails;
+    } catch (error) {
+      console.error('Error in getPaymentsWithDetailsByAdmin:', error);
+      return [];
     }
   }
 };

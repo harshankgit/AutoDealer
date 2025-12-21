@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { MessageCircle, Send, Loader2, Search, Menu, ArrowLeft } from 'lucide-react';
 import { useSupabaseChat } from '@/hooks/useSupabaseChat';
 import { MessageBubble } from '@/components/chat/MessageBubble';
@@ -105,8 +106,71 @@ export default function AdminChatsPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <div className="flex h-[calc(100vh-64px)] lg:h-screen">
+          {/* User List Panel Skeleton */}
+          <div className="lg:block w-full lg:w-96 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
+            <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+              <Skeleton className="h-6 w-3/4 mb-4" />
+              <div className="relative">
+                <Skeleton className="h-10 w-full" />
+              </div>
+            </div>
+
+            <div className="overflow-y-auto h-[calc(100%-120px)]">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="p-4 border-b border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center gap-3">
+                    <Skeleton className="h-12 w-12 rounded-full" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <Skeleton className="h-4 w-1/3" />
+                        <Skeleton className="h-3 w-12" />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Skeleton className="h-3 w-2/3" />
+                        <Skeleton className="h-5 w-5 rounded-full" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Chat Window Skeleton */}
+          <div className="lg:block flex-1 flex flex-col bg-white dark:bg-gray-800">
+            <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4">
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-10 w-10 rounded-full" />
+                <div>
+                  <Skeleton className="h-4 w-32 mb-1" />
+                  <Skeleton className="h-3 w-24" />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 bg-gray-50 dark:bg-gray-900">
+              <div className="space-y-3">
+                {[...Array(6)].map((_, i) => (
+                  <div key={i} className={`flex ${i % 2 === 0 ? 'justify-start' : 'justify-end'}`}>
+                    <div className={`${i % 2 === 0 ? 'bg-white dark:bg-gray-700' : 'bg-blue-500 text-white'} rounded-lg p-3 max-w-xs lg:max-w-md`}>
+                      <Skeleton className="h-3 w-full mb-1" />
+                      <Skeleton className="h-3 w-4/5" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4">
+              <div className="flex gap-2">
+                <Skeleton className="flex-1 h-10" />
+                <Skeleton className="h-10 w-16" />
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

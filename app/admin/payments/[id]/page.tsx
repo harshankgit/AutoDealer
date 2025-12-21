@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   ArrowLeft,
   Calendar,
@@ -38,18 +39,18 @@ interface Payment {
   expected_delivery_date: string | null;
   created_at: string;
   updated_at: string;
-  user: {
+  user?: {
     username: string;
     email: string;
-    phone: string;
+    phone?: string;
   };
-  car: {
+  car?: {
     title: string;
     brand: string;
     model: string;
     year: number;
   };
-  booking: {
+  booking?: {
     start_date: string;
     end_date: string;
   };
@@ -247,8 +248,151 @@ export default function PaymentDetailsPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto py-8 px-4 flex justify-center items-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="container mx-auto py-8 px-4">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex items-center gap-4 mb-8">
+            <Skeleton className="h-10 w-10 rounded" />
+            <Skeleton className="h-8 w-64" />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Payment Information Skeleton */}
+            <div className="lg:col-span-2 space-y-6">
+              <Card className="bg-white dark:bg-gray-800">
+                <CardHeader>
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <Skeleton className="h-6 w-40 mb-2" />
+                      <Skeleton className="h-4 w-48" />
+                    </div>
+                    <Skeleton className="h-6 w-20 rounded-full" />
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Skeleton className="h-4 w-24 mb-2" />
+                      <Skeleton className="h-6 w-32" />
+                    </div>
+                    <div>
+                      <Skeleton className="h-4 w-24 mb-2" />
+                      <Skeleton className="h-6 w-32" />
+                    </div>
+                    <div>
+                      <Skeleton className="h-4 w-24 mb-2" />
+                      <Skeleton className="h-6 w-32" />
+                    </div>
+                    <div>
+                      <Skeleton className="h-4 w-32 mb-2" />
+                      <Skeleton className="h-6 w-32" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Car Information Skeleton */}
+              <Card className="bg-white dark:bg-gray-800">
+                <CardHeader>
+                  <div>
+                    <Skeleton className="h-6 w-32 mb-2" />
+                    <Skeleton className="h-4 w-48" />
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Skeleton className="h-4 w-24 mb-2" />
+                    <Skeleton className="h-6 w-full" />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Skeleton className="h-4 w-16 mb-2" />
+                      <Skeleton className="h-6 w-24" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Customer Information Skeleton */}
+              <Card className="bg-white dark:bg-gray-800">
+                <CardHeader>
+                  <div>
+                    <Skeleton className="h-6 w-40 mb-2" />
+                    <Skeleton className="h-4 w-48" />
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Skeleton className="h-4 w-16 mb-2" />
+                    <Skeleton className="h-6 w-32" />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Skeleton className="h-4 w-16 mb-2" />
+                      <Skeleton className="h-6 w-32" />
+                    </div>
+                    <div>
+                      <Skeleton className="h-4 w-16 mb-2" />
+                      <Skeleton className="h-6 w-32" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Sidebar Skeleton */}
+            <div className="space-y-6">
+              {/* Payment Actions Skeleton */}
+              <Card className="bg-white dark:bg-gray-800">
+                <CardHeader>
+                  <div>
+                    <Skeleton className="h-6 w-20 mb-2" />
+                    <Skeleton className="h-4 w-48" />
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                </CardContent>
+              </Card>
+
+              {/* Payment Receipt Skeleton */}
+              <Card className="bg-white dark:bg-gray-800">
+                <CardHeader>
+                  <div>
+                    <Skeleton className="h-6 w-32 mb-2" />
+                    <Skeleton className="h-4 w-48" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-center py-8">
+                    <Skeleton className="h-12 w-12 mx-auto mb-2" />
+                    <Skeleton className="h-4 w-32 mx-auto" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Admin Scanner Skeleton */}
+              <Card className="bg-white dark:bg-gray-800">
+                <CardHeader>
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <Skeleton className="h-6 w-32 mb-1" />
+                      <Skeleton className="h-4 w-40" />
+                    </div>
+                    <Skeleton className="h-8 w-20" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-center py-8">
+                    <Skeleton className="h-12 w-12 mx-auto mb-2" />
+                    <Skeleton className="h-4 w-40 mx-auto" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -356,12 +500,12 @@ export default function PaymentDetailsPage() {
               <CardContent className="space-y-4">
                 <div>
                   <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Car Title</Label>
-                  <p className="text-gray-900 dark:text-white">{payment.car.brand} {payment.car.model} - {payment.car.title}</p>
+                  <p className="text-gray-900 dark:text-white">{payment.car?.brand} {payment.car?.model} - {payment.car?.title}</p>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Year</Label>
-                    <p className="text-gray-900 dark:text-white">{payment.car.year}</p>
+                    <p className="text-gray-900 dark:text-white">{payment.car?.year}</p>
                   </div>
                 </div>
               </CardContent>
@@ -378,16 +522,16 @@ export default function PaymentDetailsPage() {
               <CardContent className="space-y-4">
                 <div>
                   <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Name</Label>
-                  <p className="text-gray-900 dark:text-white">{payment.user.username}</p>
+                  <p className="text-gray-900 dark:text-white">{payment.user?.username || 'N/A'}</p>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Email</Label>
-                    <p className="text-gray-900 dark:text-white">{payment.user.email}</p>
+                    <p className="text-gray-900 dark:text-white">{payment.user?.email || 'N/A'}</p>
                   </div>
                   <div>
                     <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Phone</Label>
-                    <p className="text-gray-900 dark:text-white">{payment.user.phone || 'Not provided'}</p>
+                    <p className="text-gray-900 dark:text-white">{payment.user?.phone || 'Not provided'}</p>
                   </div>
                 </div>
               </CardContent>
@@ -426,7 +570,7 @@ export default function PaymentDetailsPage() {
                     variant="outline"
                     onClick={() => {
                       // Send email to customer
-                      window.location.href = `mailto:${payment.user.email}?subject=Payment Update&body=Hi ${payment.user.username}, your payment status has been updated.`;
+                      window.location.href = `mailto:${payment.user?.email || ''}?subject=Payment Update&body=Hi ${payment.user?.username || 'Customer'}, your payment status has been updated.`;
                     }}
                   >
                     <Mail className="h-4 w-4 mr-2" />
@@ -611,7 +755,7 @@ export default function PaymentDetailsPage() {
               </div>
               <div>
                 <Label>Amount</Label>
-                <p className="text-sm font-medium">{payment ? formatPrice(payment.amount) : 'N/A'}</p>
+                <p className="text-sm font-medium">{payment?.amount ? formatPrice(payment.amount) : 'N/A'}</p>
               </div>
               <div>
                 <Label>Payment Method</Label>
@@ -711,15 +855,36 @@ export default function PaymentDetailsPage() {
               Reject this payment request. The customer will be notified.
             </DialogDescription>
           </DialogHeader>
-          
-          <div>
-            <Label htmlFor="rejectNotes">Reason for Rejection</Label>
-            <Input
-              id="rejectNotes"
-              value={adminNotes}
-              onChange={(e) => setAdminNotes(e.target.value)}
-              placeholder="Enter reason for rejection..."
-            />
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label>Customer</Label>
+                <p className="text-sm text-gray-600 dark:text-gray-300">{payment?.user?.username || 'N/A'}</p>
+              </div>
+              <div>
+                <Label>Car</Label>
+                <p className="text-sm text-gray-600 dark:text-gray-300">{payment?.car?.title || 'N/A'}</p>
+              </div>
+              <div>
+                <Label>Amount</Label>
+                <p className="text-sm font-medium">{payment?.amount ? formatPrice(payment.amount) : 'N/A'}</p>
+              </div>
+              <div>
+                <Label>Payment Method</Label>
+                <p className="text-sm text-gray-600 dark:text-gray-300">{payment?.payment_method || 'N/A'}</p>
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="rejectNotes">Reason for Rejection</Label>
+              <Input
+                id="rejectNotes"
+                value={adminNotes}
+                onChange={(e) => setAdminNotes(e.target.value)}
+                placeholder="Enter reason for rejection..."
+              />
+            </div>
           </div>
 
           <DialogFooter className="flex sm:justify-between">

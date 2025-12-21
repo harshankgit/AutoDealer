@@ -25,6 +25,7 @@ const verifyToken = (token: string) => {
 const getClientIp = (request: NextRequest): string => {
   return request.headers.get('x-forwarded-for') ||
          request.headers.get('x-real-ip') ||
+         request.headers.get('x-real-ip') ||
          request.headers.get('x-client-ip') ||
          'unknown';
 };
@@ -70,28 +71,23 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Get all bookings with related information
-    const { data: bookingsData, error: bookingsError } = await supabase
-      .from('bookings')
+    // Get all scanner images with admin information
+    const { data: scannerData, error: scannerError } = await supabase
+      .from('scanner_images')
       .select(`
         id,
-        carid,
-        userid,
+        adminid,
         roomid,
-        start_date,
-        end_date,
-        total_price,
-        status,
-        created_at,
-        updated_at,
-        users:userid(username, email)
+        image_url,
+        uploaded_at,
+        users:adminid(username, email)
       `)
-      .order('created_at', { ascending: false });
+      .order('uploaded_at', { ascending: false });
 
-    if (bookingsError) {
-      console.error('Error fetching bookings for room-wise stats:', bookingsError);
-      await logApiCall(request, 500, userId, startTime, bookingsError.message);
-      return Response.json({ error: 'Failed to fetch bookings for room-wise statistics' }, { status: 500 });
+    if (scannerError) {
+      console.error('Error fetching scanner images for room-wise stats:', scannerError);
+      await logApiCall(request, 500, userId, startTime, scannerError.message);
+      return Response.json({ error: 'Failed to fetch scanner images for room-wise statistics' }, { status: 500 });
     }
 
     // Get all rooms
@@ -101,9 +97,9 @@ export async function GET(request: NextRequest) {
       .order('name', { ascending: true });
 
     if (roomsError) {
-      console.error('Error fetching rooms for room-wise stats:', roomsError);
+      console.error('Error fetching rooms for room-wise scanner stats:', roomsError);
       await logApiCall(request, 500, userId, startTime, roomsError.message);
-      return Response.json({ error: 'Failed to fetch rooms for room-wise statistics' }, { status: 500 });
+      return Response.json({ error: 'Failed to fetch rooms for room-wise scanner statistics' }, { status: 500 });
     }
 
     // Get admin information for rooms
@@ -133,65 +129,57 @@ export async function GET(request: NextRequest) {
       return acc;
     }, {} as Record<string, any>);
 
-    // Group bookings by room
-    const bookingsByRoom: Record<string, any[]> = {};
-    bookingsData.forEach(booking => {
-      const roomId = booking.roomid;
+    // Group scanner images by room
+    const scannersByRoom: Record<string, any[]> = {};
+    scannerData.forEach(scanner => {
+      const roomId = scanner.roomid;
       if (roomId) {
-        if (!bookingsByRoom[roomId]) {
-          bookingsByRoom[roomId] = [];
+        if (!scannersByRoom[roomId]) {
+          scannersByRoom[roomId] = [];
         }
-        bookingsByRoom[roomId].push(booking);
+        scannersByRoom[roomId].push(scanner);
       }
     });
 
     // Calculate statistics for each room
-    const roomStats = roomsData.map(room => {
-      const roomBookings = bookingsByRoom[room.id] || [];
-      const totalBookings = roomBookings.length;
-      const totalRevenue = roomBookings.reduce((sum, booking) => sum + (booking.total_price || 0), 0);
-      const confirmedBookings = roomBookings.filter(b => b.status === 'Confirmed' || b.status === 'Completed' || b.status === 'Sold').length;
-      const pendingBookings = roomBookings.filter(b => b.status === 'Pending').length;
-      const activeBookings = roomBookings.filter(b => ['Booked', 'Confirmed'].includes(b.status)).length;
-
-      // Get unique customers
-      const uniqueCustomerIds = Array.from(new Set(roomBookings.map(b => b.userid)));
+    const roomScannerStats = roomsData.map(room => {
+      const roomScanners = scannersByRoom[room.id] || [];
+      const totalScanners = roomScanners.length;
+      
+      // Get unique admins who uploaded to this room
+      const uniqueAdminIds = Array.from(new Set(roomScanners.map(s => s.adminid)));
       
       return {
         room_id: room.id,
         room_name: room.name,
         room_location: room.location,
         admin_info: adminMap[room.adminid] || null,
-        total_bookings: totalBookings,
-        total_revenue: totalRevenue,
-        confirmed_bookings: confirmedBookings,
-        pending_bookings: pendingBookings,
-        active_bookings: activeBookings,
-        unique_customers: uniqueCustomerIds.length,
-        bookings: roomBookings.map(booking => ({
-          id: booking.id,
-          customer_name: (booking.users as any)?.username || 'Unknown Customer',
-          customer_email: (booking.users as any)?.email || 'Unknown Email',
-          car_id: booking.carid,
-          booking_date: booking.created_at,
-          status: booking.status,
-          total_amount: booking.total_price
+        total_scanners: totalScanners,
+        unique_admins: uniqueAdminIds.length,
+        last_uploaded: roomScanners.length > 0 
+          ? roomScanners[0].uploaded_at 
+          : null,
+        scanners: roomScanners.map(scanner => ({
+          id: scanner.id,
+          admin_name: (scanner.users as any)?.username || 'Unknown Admin',
+          admin_email: (scanner.users as any)?.email || 'Unknown Email',
+          image_url: scanner.image_url,
+          uploaded_at: scanner.uploaded_at
         }))
       };
     });
 
     const response = Response.json({
-      room_stats: roomStats,
+      room_scanner_stats: roomScannerStats,
       total_rooms: roomsData.length,
-      total_bookings: bookingsData.length,
-      total_revenue: bookingsData.reduce((sum, booking) => sum + (booking.total_price || 0), 0)
+      total_scanners: scannerData.length
     });
 
     await logApiCall(request, response.status, userId, startTime);
     return response;
   } catch (error: any) {
-    console.error('Unexpected error fetching room-wise booking statistics:', error);
+    console.error('Unexpected error fetching room-wise scanner statistics:', error);
     await logApiCall(request, 500, userId, startTime, error.message);
-    return Response.json({ error: 'Failed to fetch room-wise booking statistics' }, { status: 500 });
+    return Response.json({ error: 'Failed to fetch room-wise scanner statistics' }, { status: 500 });
   }
 }
