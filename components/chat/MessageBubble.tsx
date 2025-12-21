@@ -74,7 +74,7 @@ export function MessageBubble({ message, isOwnMessage, senderName, senderAvatar 
 
     return (
         <div
-            className={`flex gap-2 ${isOwnMessage ? 'flex-row-reverse' : 'flex-row'} mb-4 animate-slideIn`}
+            className={`flex gap-2 ${isOwnMessage ? 'flex-row-reverse' : 'flex-row'} mb-4`}
         >
             <Avatar className="w-8 h-8 flex-shrink-0 ring-2 ring-white dark:ring-gray-800 shadow-sm">
                 <AvatarImage src={senderAvatar} alt={senderName} />
@@ -108,36 +108,10 @@ export function MessageBubble({ message, isOwnMessage, senderName, senderAvatar 
                         {formatTime(message.timestamp)}
                     </span>
                     {isOwnMessage && message.is_read && (
-                        <span className="text-xs text-blue-600 dark:text-blue-400 animate-fadeIn font-bold">✓✓</span>
+                        <span className="text-xs text-blue-600 dark:text-blue-400 font-bold">✓✓</span>
                     )}
                 </div>
             </div>
-
-            <style jsx>{`
-        @keyframes slideIn {
-          from {
-            opacity: 0;
-            transform: translateY(10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        
-        .animate-slideIn {
-          animation: slideIn 0.3s ease-out;
-        }
-        
-        .animate-fadeIn {
-          animation: fadeIn 0.5s ease-in;
-        }
-      `}</style>
         </div>
     );
 }
