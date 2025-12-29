@@ -19,7 +19,14 @@ export async function GET(request: NextRequest) {
       return Response.json({ error: 'Failed to fetch slider images' }, { status: 500 });
     }
 
-    return Response.json({ images: data || [] });
+    const response = Response.json({ images: data || [] });
+
+    // Add headers to prevent caching
+    response.headers.set('Cache-Control', 'no-store, max-age=0');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+
+    return response;
   } catch (error) {
     console.error('Unexpected error fetching slider images:', error);
     return Response.json({ error: 'Failed to fetch slider images' }, { status: 500 });

@@ -470,7 +470,7 @@ export default function Home() {
             </motion.div>
 
             {/* Performance Metrics */}
-            <motion.div
+            {/* <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.5, delay: 0.3 }}
@@ -539,7 +539,7 @@ export default function Home() {
                   </div>
                 </CardContent>
               </Card>
-            </motion.div>
+            </motion.div> */}
           </div>
         </motion.div>
       ) : (

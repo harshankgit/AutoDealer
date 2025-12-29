@@ -47,14 +47,15 @@ self.addEventListener('activate', (event) => {
 // Fetch Event - Handle requests
 self.addEventListener('fetch', (event) => {
   console.log('[Service Worker] Fetching:', event.request.url);
-  
+
   // Skip non-GET requests and cross-origin requests
   if (event.request.method !== 'GET') {
     return;
   }
-  
-  const isOwnOrigin = new URL(event.request.url).origin === self.location.origin;
-  
+
+  const url = new URL(event.request.url);
+  const isOwnOrigin = url.origin === self.location.origin;
+
   if (!isOwnOrigin) {
     // For external requests, try network first then fail silently
     event.respondWith(
@@ -65,8 +66,19 @@ self.addEventListener('fetch', (event) => {
     );
     return;
   }
-  
-  // Handle requests to our own origin
+
+  // For API routes, always fetch from network to avoid caching issues
+  if (url.pathname.startsWith('/api/')) {
+    event.respondWith(
+      fetch(event.request).catch((error) => {
+        console.log('[Service Worker] API request failed:', error);
+        return new Response('', { status: 503, statusText: 'Service Unavailable' });
+      })
+    );
+    return;
+  }
+
+  // Handle requests to our own origin (non-API)
   event.respondWith(
     caches.match(event.request)
       .then((response) => {
@@ -84,10 +96,10 @@ self.addEventListener('fetch', (event) => {
             .catch((error) => {
               console.log('[Service Worker] Network request failed:', error);
             });
-          
+
           return response;
         }
-        
+
         // If not in cache, fetch from network
         return fetch(event.request)
           .then((networkResponse) => {
@@ -95,25 +107,25 @@ self.addEventListener('fetch', (event) => {
             if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
               return networkResponse;
             }
-            
+
             // Clone the response and cache it
             const responseToCache = networkResponse.clone();
-            
+
             caches.open(DYNAMIC_CACHE)
               .then((cache) => {
                 cache.put(event.request, responseToCache);
               });
-            
+
             return networkResponse;
           })
           .catch((error) => {
             console.log('[Service Worker] Network request failed:', error);
-            
+
             // Return offline page for HTML requests
             if (event.request.headers.get('accept').includes('text/html')) {
               return caches.match('/offline');
             }
-            
+
             // Return error response for other requests
             throw error;
           });
