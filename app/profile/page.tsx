@@ -796,7 +796,7 @@ export default function ProfilePage() {
               {user?.role === 'superadmin' && (
                 <TabsTrigger value="settings">Settings</TabsTrigger>
               )}
-              <TabsTrigger value="security">Security</TabsTrigger>
+              {!user?.role || user.role !== 'superadmin' ? <TabsTrigger value="security">Security</TabsTrigger> : null}
             </TabsList>
           </div>
 

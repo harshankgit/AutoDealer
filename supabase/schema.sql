@@ -617,6 +617,34 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Create the password_reset_tokens table
+CREATE TABLE password_reset_tokens (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    email VARCHAR(255) NOT NULL,
+    token VARCHAR(255) NOT NULL UNIQUE,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    used BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create indexes for better query performance
+CREATE INDEX idx_password_reset_tokens_email ON password_reset_tokens(email);
+CREATE INDEX idx_password_reset_tokens_token ON password_reset_tokens(token);
+CREATE INDEX idx_password_reset_tokens_expires_at ON password_reset_tokens(expires_at);
+CREATE INDEX idx_password_reset_tokens_used ON password_reset_tokens(used);
+
+-- Enable Row Level Security on password_reset_tokens table
+ALTER TABLE password_reset_tokens ENABLE ROW LEVEL SECURITY;
+
+-- Apply the function to password_reset_tokens table
+CREATE TRIGGER update_password_reset_tokens_updated_at
+    BEFORE UPDATE ON password_reset_tokens
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- RLS Policies for password_reset_tokens table
+CREATE POLICY "Service role can manage password reset tokens" ON password_reset_tokens FOR ALL TO service_role USING (true);
+
 -- Create indexes for performance optimization
 CREATE INDEX idx_chat_messages_conversation_sender ON chat_messages(conversation_id, senderid);
 CREATE INDEX idx_chat_messages_conversation_read ON chat_messages(conversation_id, is_read);
