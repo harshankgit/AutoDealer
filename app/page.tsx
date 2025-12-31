@@ -11,6 +11,7 @@ import { motion } from 'framer-motion';
 import MonthlyVisitorsChart from '@/components/charts/MonthlyVisitorsChart';
 import LineChart from '@/components/charts/LineChart';
 import PieChart from '@/components/charts/PieChart';
+import BookingChart from '@/components/charts/BookingChart';
 import dynamic from 'next/dynamic';
 import { LoadingLink } from '@/components/ui/LoadingLink';
 import ChatbotComponent from '@/components/chatbot/ChatbotComponent';
@@ -23,6 +24,7 @@ interface HomePageStats {
   monthlyVisits: { month: string; count: number }[];
   userGrowthData: { month: string; count: number }[];
   carDistributionData: { brand: string; count: number }[];
+  monthlyBookings: { month: string; count: number; revenue: number; pending: number; confirmed: number; completed: number }[];
   performanceMetrics?: {
     avgVisitDuration: string;
     bounceRate: string;
@@ -48,6 +50,7 @@ export default function Home() {
     monthlyVisits: [],
     userGrowthData: [],
     carDistributionData: [],
+    monthlyBookings: [],
     performanceMetrics: {
       avgVisitDuration: '3m 45s',
       bounceRate: '32.4%',
@@ -127,8 +130,28 @@ export default function Home() {
         console.error('Error fetching homepage stats:', error);
       })
       .finally(() => {
-        setChartsLoading(false);
-        setStatsLoading(false);
+        // Fetch monthly booking data after homepage stats are loaded
+        fetch('/api/monthly-bookings', { cache: 'no-store' })
+          .then((res) => res.json())
+          .then((bookingData) => {
+            // Update monthlyBookings even if there's an error (it will be empty array)
+            setStats(prev => ({
+              ...prev,
+              monthlyBookings: bookingData.monthlyBookings || prev.monthlyBookings || []
+            }));
+          })
+          .catch((error) => {
+            console.error('Error fetching monthly booking data:', error);
+            // Set empty array in case of error
+            setStats(prev => ({
+              ...prev,
+              monthlyBookings: []
+            }));
+          })
+          .finally(() => {
+            setChartsLoading(false);
+            setStatsLoading(false);
+          });
       });
   }, []);
 
@@ -303,8 +326,28 @@ export default function Home() {
                       console.error('Error fetching homepage stats:', error);
                     })
                     .finally(() => {
-                      setChartsLoading(false);
-                      setStatsLoading(false);
+                      // Fetch monthly booking data after homepage stats are loaded
+                      fetch('/api/monthly-bookings', { cache: 'no-store' })
+                        .then((res) => res.json())
+                        .then((bookingData) => {
+                          // Update monthlyBookings even if there's an error (it will be empty array)
+                          setStats(prev => ({
+                            ...prev,
+                            monthlyBookings: bookingData.monthlyBookings || prev.monthlyBookings || []
+                          }));
+                        })
+                        .catch((error) => {
+                          console.error('Error fetching monthly booking data:', error);
+                          // Set empty array in case of error
+                          setStats(prev => ({
+                            ...prev,
+                            monthlyBookings: []
+                          }));
+                        })
+                        .finally(() => {
+                          setChartsLoading(false);
+                          setStatsLoading(false);
+                        });
                     });
                 }}
                 disabled={statsLoading || chartsLoading}
@@ -469,77 +512,44 @@ export default function Home() {
               </Card>
             </motion.div>
 
-            {/* Performance Metrics */}
-            {/* <motion.div
+            {/* Monthly Bookings Chart */}
+            <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.5, delay: 0.3 }}
             >
-              <Card className="bg-white dark:bg-gray-800 shadow-lg border border-gray-200 dark:border-gray-700 h-full">
+              <Card className="bg-white dark:bg-gray-800 shadow-lg border border-gray-200 dark:border-gray-700 h-full flex flex-col">
                 <CardHeader className="pb-2">
                   <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-white">
-                    <TrendingUp className="h-5 w-5 text-yellow-500" />
-                    Performance Metrics
+                    <TrendingUp className="h-5 w-5 text-green-500" />
+                    Monthly Bookings
                   </CardTitle>
                   <CardDescription className="text-gray-500 dark:text-gray-400 text-sm">
-                    Key performance indicators
+                    Booking trends by month for the past year
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                      <p className="text-sm text-blue-600 dark:text-blue-400 mb-1">Avg. Visit Duration</p>
-                      <p className="font-semibold text-gray-900 dark:text-white">3m 45s</p>
-                    </div>
-                    <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
-                      <p className="text-sm text-red-600 dark:text-red-400 mb-1">Bounce Rate</p>
-                      <p className="font-semibold text-gray-900 dark:text-white">32.4%</p>
-                    </div>
-                    <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                      <p className="text-sm text-green-600 dark:text-green-400 mb-1">Conversion Rate</p>
-                      <p className="font-semibold text-gray-900 dark:text-white">4.7%</p>
-                    </div>
-                    <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-                      <p className="text-sm text-purple-600 dark:text-purple-400 mb-1">Page Views</p>
-                      <p className="font-semibold text-gray-900 dark:text-white">24.8k</p>
-                    </div>
-                  </div>
-
-                  <div className="mt-6">
-                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Top Performing Pages</h4>
-                    <div className="space-y-3">
-                      <div>
-                        <div className="flex justify-between text-sm mb-1">
-                          <span className="text-gray-600 dark:text-gray-400 truncate">/cars</span>
-                          <span className="font-medium text-gray-900 dark:text-white">32.4%</span>
-                        </div>
-                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                          <div className="bg-blue-600 h-2 rounded-full" style={{ width: '32.4%' }}></div>
-                        </div>
-                      </div>
-                      <div>
-                        <div className="flex justify-between text-sm mb-1">
-                          <span className="text-gray-600 dark:text-gray-400 truncate">/rooms</span>
-                          <span className="font-medium text-gray-900 dark:text-white">24.1%</span>
-                        </div>
-                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                          <div className="bg-green-600 h-2 rounded-full" style={{ width: '24.1%' }}></div>
-                        </div>
-                      </div>
-                      <div>
-                        <div className="flex justify-between text-sm mb-1">
-                          <span className="text-gray-600 dark:text-gray-400 truncate">/dashboard</span>
-                          <span className="font-semibold text-gray-900 dark:text-white">18.7%</span>
-                        </div>
-                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                          <div className="bg-purple-600 h-2 rounded-full" style={{ width: '18.7%' }}></div>
-                        </div>
-                      </div>
-                    </div>
+                <CardContent className="flex-1 flex items-center justify-center">
+                  <div className="w-full h-64 sm:h-72 md:h-80">
+                    <BookingChart
+                      data={{
+                        labels: stats.monthlyBookings.map(item => item.month),
+                        datasets: [
+                          {
+                            label: 'Bookings',
+                            data: stats.monthlyBookings.map(item => item.count),
+                            borderColor: 'rgb(34, 197, 94)',
+                            backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                            tension: 0.4,
+                            fill: true,
+                          }
+                        ]
+                      }}
+                      title="Monthly Bookings"
+                    />
                   </div>
                 </CardContent>
               </Card>
-            </motion.div> */}
+            </motion.div>
           </div>
         </motion.div>
       ) : (
