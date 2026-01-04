@@ -28,6 +28,7 @@ import ProfileHelp from '@/components/help/ProfileHelp';
 import AuthHelp from '@/components/help/AuthHelp';
 import AdminHelp from '@/components/help/AdminHelp';
 import HelpHeader from '@/components/help/HelpHeader';
+import RoleBasedAccessHelp from '@/components/help/RoleBasedAccessHelp';
 
 export default function HelpPage() {
   const [selectedSection, setSelectedSection] = useState<string | null>(null);
@@ -95,6 +96,14 @@ export default function HelpPage() {
       roles: ['admin', 'superadmin']
     },
     {
+      id: 'rbac',
+      title: 'Role-Based Access Control',
+      description: 'Learn about role-based navigation and permissions',
+      icon: Shield,
+      color: 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400',
+      roles: ['user', 'admin', 'superadmin']
+    },
+    {
       id: 'roles',
       title: 'Role-Specific Guides',
       description: 'Detailed guides for each user role',
@@ -134,6 +143,10 @@ export default function HelpPage() {
       admin: {
         title: language === 'en' ? 'Admin Features' : 'एडमिन सुविधाएं',
         description: language === 'en' ? 'Advanced admin and superadmin tools' : 'उन्नत एडमिन और सुपरएडमिन उपकरण'
+      },
+      rbac: {
+        title: language === 'en' ? 'Role-Based Access Control' : 'भूमिका-आधारित पहुंच नियंत्रण',
+        description: language === 'en' ? 'Learn about role-based navigation and permissions' : 'भूमिका-आधारित नेविगेशन और अनुमतियों के बारे में जानें'
       },
       roles: {
         title: language === 'en' ? 'Role-Specific Guides' : 'भूमिका-विशिष्ट मार्गदर्शिका',
@@ -219,6 +232,8 @@ export default function HelpPage() {
         return <AuthHelp language={language} />;
       case 'admin':
         return <AdminHelp language={language} userRole={userRole} />;
+      case 'rbac':
+        return <RoleBasedAccessHelp language={language} />;
       case 'roles':
         return <RoleGuides />;
       default:

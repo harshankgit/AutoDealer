@@ -1,5 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Calendar, CreditCard, User, Shield, CheckCircle, Clock, DollarSign, Lock } from 'lucide-react';
+import { Calendar, CreditCard, User, Shield, CheckCircle, Clock, Lock } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface BookingsHelpProps {
@@ -134,7 +134,6 @@ const BookingsHelp: React.FC<BookingsHelpProps> = ({ language }) => {
         <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-green-50 dark:from-gray-800 dark:to-gray-900">
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-green-600 dark:text-green-400" />
               <CardTitle>{t.paymentMethods}</CardTitle>
             </div>
           </CardHeader>

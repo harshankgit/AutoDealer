@@ -67,7 +67,9 @@ export default function ProfilePage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showPassword, setShowPassword] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -1516,7 +1518,7 @@ export default function ProfilePage() {
                             <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-500" />
                             <Input
                               id="current-password"
-                              type={showPassword ? "text" : "password"}
+                              type={showCurrentPassword ? "text" : "password"}
                               value={currentPassword}
                               onChange={(e) => setCurrentPassword(e.target.value)}
                               className="pl-10"
@@ -1527,9 +1529,9 @@ export default function ProfilePage() {
                               variant="ghost"
                               size="sm"
                               className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                              onClick={() => setShowPassword(!showPassword)}
+                              onClick={() => setShowCurrentPassword(!showCurrentPassword)}
                             >
-                              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                              {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                             </Button>
                           </div>
                         </div>
@@ -1540,12 +1542,21 @@ export default function ProfilePage() {
                             <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-500" />
                             <Input
                               id="new-password"
-                              type={showPassword ? "text" : "password"}
+                              type={showNewPassword ? "text" : "password"}
                               value={newPassword}
                               onChange={(e) => setNewPassword(e.target.value)}
                               className="pl-10"
                               required
                             />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                              onClick={() => setShowNewPassword(!showNewPassword)}
+                            >
+                              {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </Button>
                           </div>
                         </div>
 
@@ -1555,12 +1566,21 @@ export default function ProfilePage() {
                             <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-500" />
                             <Input
                               id="confirm-password"
-                              type={showPassword ? "text" : "password"}
+                              type={showConfirmPassword ? "text" : "password"}
                               value={confirmPassword}
                               onChange={(e) => setConfirmPassword(e.target.value)}
                               className="pl-10"
                               required
                             />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                            >
+                              {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </Button>
                           </div>
                         </div>
 

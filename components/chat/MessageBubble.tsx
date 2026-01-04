@@ -1,6 +1,6 @@
 import { Message } from '@/types/chat';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Car, MapPin, Calendar, DollarSign } from 'lucide-react';
+import { Car, MapPin, Calendar } from 'lucide-react';
 import Link from 'next/link';
 
 interface MessageBubbleProps {
@@ -51,7 +51,6 @@ export function MessageBubble({ message, isOwnMessage, senderName, senderAvatar 
                                 </div>
 
                                 <div className="flex items-center gap-2">
-                                    <DollarSign className="h-4 w-4 text-green-600 dark:text-green-400" />
                                     <span className="text-lg font-bold bg-gradient-to-r from-green-600 to-emerald-600 dark:from-green-400 dark:to-emerald-400 bg-clip-text text-transparent">
                                         ₹{car.price?.toLocaleString()}
                                     </span>

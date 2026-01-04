@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Car, Users, Shield, MessageCircle, Search, Star, TrendingUp, BarChart3 } from 'lucide-react';
+import { Car, Users, Shield, MessageCircle, Search, Star, TrendingUp, BarChart3, Sparkles } from 'lucide-react';
 import TypingEffect from '@/components/typing/TypingEffect';
 import AnimatedCounter from '@/components/ui/animated-counter';
 import { motion } from 'framer-motion';
@@ -15,6 +15,7 @@ import BookingChart from '@/components/charts/BookingChart';
 import dynamic from 'next/dynamic';
 import { LoadingLink } from '@/components/ui/LoadingLink';
 import ChatbotComponent from '@/components/chatbot/ChatbotComponent';
+import SimpleCarPriceEstimator from '@/components/CarPriceEstimator/SimpleCarPriceEstimator';
 
 interface HomePageStats {
   totalUsers: number;
@@ -244,6 +245,23 @@ export default function Home() {
               )}
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* AI Car Price Estimator Section */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="text-center mb-8">
+          <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4 flex items-center justify-center gap-2">
+            <Sparkles className="h-6 w-6 text-yellow-500" />
+            AI-Powered Car Price Estimator
+          </h2>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            Get an instant, accurate estimate of your car's market value with our AI technology
+          </p>
+        </div>
+
+        <div className="flex justify-center">
+          <SimpleCarPriceEstimator compact={true} />
         </div>
       </div>
 
@@ -565,10 +583,20 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">Ready to Find Your Next Car?</h2>
           <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">Join thousands of satisfied customers who found their perfect car through AutoDealer.</p>
-          <div className="w-full max-w-xs mx-auto">
+          <div className="w-full max-w-xs mx-auto space-y-3">
             <LoadingLink href={user ? '/rooms' : '/register'}>
               <Button size="lg" className="w-full bg-white text-blue-600 hover:bg-gray-100 dark:bg-gray-100 dark:text-blue-700 dark:hover:bg-gray-200">
                 {user ? 'Browse Cars Now' : 'Start Your Journey'}
+              </Button>
+            </LoadingLink>
+            <LoadingLink href="/find-perfect-car">
+              <Button size="lg" variant="outline" className="w-full">
+                Find My Perfect Car
+              </Button>
+            </LoadingLink>
+            <LoadingLink href="/estimate-car-value">
+              <Button size="lg" variant="outline" className="w-full">
+                Estimate Car Value
               </Button>
             </LoadingLink>
           </div>

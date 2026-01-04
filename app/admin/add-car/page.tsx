@@ -81,15 +81,24 @@ export default function AddCarPage() {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       handleFiles(e.dataTransfer.files);
     }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
+    console.log('File input changed:', e.target.files); // Debug log
+    if (e.target.files && e.target.files.length > 0) {
       handleFiles(e.target.files);
+    }
+  };
+
+  // Function to manually trigger file input click
+  const triggerFileInput = () => {
+    const fileInput = document.getElementById('file-upload') as HTMLInputElement;
+    if (fileInput && !isUploading) {
+      fileInput.click();
     }
   };
 
@@ -124,7 +133,8 @@ export default function AddCarPage() {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to upload files');
+        const errorResult = await response.json();
+        throw new Error(errorResult.error || 'Failed to upload files');
       }
 
       // Use the image URLs returned from the upload API
@@ -135,6 +145,7 @@ export default function AddCarPage() {
         ...prev,
         images: [...prev.images.filter(url => url !== ''), ...newImageUrls]
       }));
+      console.log('Uploaded images:', newImageUrls); // Debug log
 
     } catch (err: any) {
       console.error('Error uploading files:', err);
@@ -321,7 +332,7 @@ export default function AddCarPage() {
               Provide comprehensive information about the car
             </CardDescription>
           </CardHeader>
-          
+
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-8">
               {error && (
@@ -333,7 +344,7 @@ export default function AddCarPage() {
               {/* Basic Information */}
               <div className="space-y-6">
                 <h3 className="text-lg font-semibold text-gray-900">Basic Information</h3>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="title">Car Title *</Label>
                   <Input
@@ -488,25 +499,30 @@ export default function AddCarPage() {
                   <h3 className="text-lg font-semibold text-gray-900">Car Images</h3>
                   <p className="text-sm text-gray-600">Upload high-quality images of your car (up to 10 images)</p>
                 </div>
-                
+
                 {/* Drag and drop area */}
-                <div 
+                <div
                   className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
                     dragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
                   }`}
                   onDragEnter={handleDrag}
                   onDragLeave={handleDrag}
-                  onDragOver={handleDrag}
+                  onDragOver={(e) => {
+                    handleDrag(e);
+                    e.preventDefault(); // Important: prevent default to allow drop
+                  }}
                   onDrop={handleDrop}
                 >
                   <div className="flex flex-col items-center justify-center space-y-2">
                     <Upload className="h-10 w-10 text-gray-400" />
-                    <div className="flex text-sm text-gray-600">
-                      <label
-                        htmlFor="file-upload"
+                    <div className="flex flex-col sm:flex-row text-sm text-gray-600 items-center justify-center gap-2">
+                      <div
+                        onClick={triggerFileInput}
                         className="relative cursor-pointer rounded-md bg-white font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none"
                       >
-                        <span>Upload files</span>
+                        <span className="px-2 py-1 border border-blue-500 rounded hover:bg-blue-50 transition-colors">
+                          {isUploading ? 'Uploading...' : 'Select Files'}
+                        </span>
                         <input
                           id="file-upload"
                           name="file-upload"
@@ -517,13 +533,34 @@ export default function AddCarPage() {
                           onChange={handleFileSelect}
                           disabled={isUploading}
                         />
-                      </label>
-                      <p className="pl-1">or drag and drop</p>
+                      </div>
+                      <span className="hidden sm:block">or</span>
+                      <span>drag and drop</span>
                     </div>
                     <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
                   </div>
                 </div>
-                
+
+                {/* Alternative upload button for better accessibility */}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={triggerFileInput}
+                  disabled={isUploading}
+                  className="w-full mt-4"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  {isUploading ? 'Uploading...' : 'Select Images'}
+                </Button>
+
+                {/* Error message display */}
+                {error && (
+                  <div className="mt-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">
+                    <p>{error}</p>
+                    <p className="mt-1">Note: Make sure Supabase storage is configured properly.</p>
+                  </div>
+                )}
+
                 {/* Image preview grid */}
                 {formData.images.length > 0 && (
                   <div className="mt-4">
@@ -553,7 +590,7 @@ export default function AddCarPage() {
                     </p>
                   </div>
                 )}
-                
+
                 {/* Individual image URL inputs */}
                 {formData.images.map((url, index) => (
                   <div key={`url-${index}`} className="flex gap-2">
@@ -620,7 +657,7 @@ export default function AddCarPage() {
               <div className="space-y-6">
                 <h3 className="text-lg font-semibold text-gray-900">Technical Specifications</h3>
                 <p className="text-sm text-gray-600">Optional: Add detailed technical specifications</p>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="engine">Engine</Label>
@@ -708,7 +745,7 @@ export default function AddCarPage() {
                       )}
                     </div>
                   ))}
-                  
+
                   <Button
                     type="button"
                     variant="outline"
@@ -727,8 +764,8 @@ export default function AddCarPage() {
                     Cancel
                   </Button>
                 </Link>
-                <Button 
-                  type="submit" 
+                <Button
+                  type="submit"
                   className="flex-1 h-11 bg-blue-600 hover:bg-blue-700"
                   disabled={isLoading}
                 >

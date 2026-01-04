@@ -60,63 +60,81 @@ export async function POST(request: Request) {
       const fileName = `${timestamp}_${randomString}_${file.name}`;
       const folderName = 'car-images';
 
-      // List of potential bucket names to try - check most common ones first
-      const potentialBuckets = ['public', 'car-images', 'avatars', 'images', 'storage', 'files'];
-      let uploadResult = null;
-      let bucketName = '';
+      // Use a specific bucket name - 'images' based on the storage.ts configuration
+      const bucketName = 'images';
+      const uploadResult = await supabase
+        .storage
+        .from(bucketName)
+        .upload(`${folderName}/${fileName}`, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
 
-      // Try each bucket until one works
-      for (const bucket of potentialBuckets) {
-        uploadResult = await supabase
+      if (uploadResult.error) {
+        console.error('First upload attempt failed:', uploadResult.error);
+
+        // Try 'public' bucket as fallback
+        const fallbackUploadResult = await supabase
           .storage
-          .from(bucket)
+          .from('public')
           .upload(`${folderName}/${fileName}`, file, {
             cacheControl: '3600',
             upsert: false
           });
 
-        if (!uploadResult.error) {
-          bucketName = bucket;
-          break; // Successfully uploaded, exit the loop
-        } else if (uploadResult.error.message.includes('Bucket not found')) {
-          // Try the next bucket
-          continue;
+        if (fallbackUploadResult.error) {
+          console.error('Fallback upload also failed:', fallbackUploadResult.error);
+          return NextResponse.json(
+            { error: `Failed to upload file: ${uploadResult.error.message} and fallback also failed: ${fallbackUploadResult.error.message}` },
+            { status: 500 }
+          );
         } else {
-          // Some other error, don't continue to try other buckets
-          break;
+          // Fallback succeeded
+          // Get public URL for the uploaded file from 'public' bucket
+          const { data: publicUrlData } = supabase
+            .storage
+            .from('public')
+            .getPublicUrl(`${folderName}/${fileName}`);
+
+          if (publicUrlData?.publicUrl) {
+            // Save file metadata to database using Supabase service
+            const fileDoc = await fileServices.createFile({
+              name: fileName,
+              path: `public/${folderName}/${fileName}`, // Store relative path in the DB
+              size: file.size,
+              type: file.type,
+              uploaded_by: decodedToken.userId,
+            });
+
+            if (fileDoc) {
+              uploadedFileIds.push(fileDoc.id);
+              uploadedFileUrls.push(publicUrlData.publicUrl);
+            }
+          }
+          continue; // Continue to next file
         }
-      }
+      } else {
+        // First upload succeeded
+        // Get public URL for the uploaded file
+        const { data: publicUrlData } = supabase
+          .storage
+          .from(bucketName)
+          .getPublicUrl(`${folderName}/${fileName}`);
 
-      if (!uploadResult || uploadResult.error) {
-        // If all buckets failed, return the last error
-        const error = uploadResult?.error || { message: 'No available buckets found' };
-        console.error('Supabase storage upload error:', error);
-        return NextResponse.json(
-          { error: `Failed to upload file: ${error.message}` },
-          { status: 500 }
-        );
-      }
+        if (publicUrlData?.publicUrl) {
+          // Save file metadata to database using Supabase service
+          const fileDoc = await fileServices.createFile({
+            name: fileName,
+            path: `${folderName}/${fileName}`, // Store relative path in the DB
+            size: file.size,
+            type: file.type,
+            uploaded_by: decodedToken.userId,
+          });
 
-      // Get public URL for the uploaded file
-      const { data: publicUrlData } = supabase
-        .storage
-        .from(bucketName)
-        .getPublicUrl(`${folderName}/${fileName}`);
-
-      if (publicUrlData?.publicUrl) {
-        // Save file metadata to database using Supabase service
-        // Store the full path including bucket name for retrieval
-        const fileDoc = await fileServices.createFile({
-          name: fileName,
-          path: `${bucketName}/${folderName}/${fileName}`, // Store full path in the DB
-          size: file.size,
-          type: file.type,
-          uploaded_by: decodedToken.userId,
-        });
-
-        if (fileDoc) {
-          uploadedFileIds.push(fileDoc.id);
-          uploadedFileUrls.push(publicUrlData.publicUrl);
+          if (fileDoc) {
+            uploadedFileIds.push(fileDoc.id);
+            uploadedFileUrls.push(publicUrlData.publicUrl);
+          }
         }
       }
     }
